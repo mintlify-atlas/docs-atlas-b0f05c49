@@ -1,0 +1,305 @@
+---
+title: Management Tools
+description: Add-on scripts and PVE management tools for Proxmox administration
+---
+
+Management tools help you administer, monitor, and maintain your Proxmox VE environment. These include add-on scripts for containers and system-level tools for the Proxmox host.
+
+## Addon Scripts
+
+Addon scripts install additional software into existing LXC containers. Run these from within the container or as root on the Proxmox host.
+
+### Running Addon Scripts
+
+<Steps>
+  <Step title="Access the Container">
+    Enter the container shell from Proxmox or use:
+
+    ```bash
+    pct enter <container-id>
+    ```
+  </Step>
+
+  <Step title="Run the Addon Script">
+    Execute the addon script:
+
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/netdata.sh)"
+    ```
+  </Step>
+
+  <Step title="Follow the Prompts">
+    Complete the installation following any prompts.
+  </Step>
+
+  <Step title="Access the Tool">
+    Use the provided URL or access information.
+  </Step>
+</Steps>
+
+### Available Addon Scripts
+
+Located in `tools/addon/`:
+
+<CodeGroup>
+```bash Netdata
+# Real-time performance monitoring
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/netdata.sh)"
+```
+
+```bash Dockge
+# Docker Compose stack manager
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/dockge.sh)"
+```
+
+```bash Coolify
+# Self-hostable Heroku/Netlify alternative
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/coolify.sh)"
+```
+
+```bash FileBrowser
+# Web-based file manager
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/filebrowser.sh)"
+```
+</CodeGroup>
+
+### Complete Addon List
+
+**Monitoring & Management**
+- `netdata.sh` - Real-time performance monitoring
+- `glances.sh` - System monitoring tool
+- `cronmaster.sh` - Cron job manager
+- `komodo.sh` - Infrastructure monitoring
+
+**Docker Management**
+- `dockge.sh` - Docker Compose stack manager
+- `coolify.sh` - Self-hosting platform
+- `dokploy.sh` - Docker deployment tool
+
+**Development Tools**
+- `coder-code-server.sh` - VS Code in browser
+- `pyenv.sh` - Python version manager
+
+**File Management**
+- `filebrowser.sh` - Web file browser
+- `filebrowser-quantum.sh` - Quantum FileBrowser
+- `copyparty.sh` - File sharing server
+
+**Web Services**
+- `webmin.sh` - Web-based system administration
+- `phpmyadmin.sh` - MySQL/MariaDB admin
+- `olivetin.sh` - Web UI for shell commands
+
+**Monitoring Exporters**
+- `pihole-exporter.sh` - Pi-hole Prometheus exporter
+- `qbittorrent-exporter.sh` - qBittorrent metrics
+- `nextcloud-exporter.sh` - Nextcloud metrics
+- `prometheus-paperless-ngx-exporter.sh` - Paperless-ngx metrics
+
+**Media & Utilities**
+- `jellystat.sh` - Jellyfin statistics
+- `immich-public-proxy.sh` - Immich public sharing
+- `arcane.sh` - Arcane tooling
+
+**Security**
+- `crowdsec.sh` - Crowdsec security engine
+
+**Platform Add-ons**
+- `runtipi.sh` - RunTipi platform
+- `all-templates.sh` - All container templates
+
+**Networking**
+- `add-tailscale-lxc.sh` - Add Tailscale to container
+- `add-netbird-lxc.sh` - Add NetBird to container
+- `adguardhome-sync.sh` - Sync AdGuard Home configs
+
+<Note>
+Addon scripts are designed to be run inside existing containers, not on the Proxmox host.
+</Note>
+
+## PVE Management Tools
+
+PVE tools run on the Proxmox host to manage the hypervisor itself. Run these from the Proxmox node shell.
+
+### Running PVE Tools
+
+```bash
+# Run directly on Proxmox host
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/post-pve-install.sh)"
+```
+
+### Available PVE Tools
+
+Located in `tools/pve/`:
+
+<CodeGroup>
+```bash Post-Install Script
+# Optimize fresh Proxmox installation
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/post-pve-install.sh)"
+```
+
+```bash Update LXCs
+# Update all containers at once
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs.sh)"
+```
+
+```bash Microcode Updates
+# Install CPU microcode updates
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/microcode.sh)"
+```
+
+```bash Hardware Acceleration
+# Enable Intel/AMD GPU passthrough
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/hw-acceleration.sh)"
+```
+</CodeGroup>
+
+### Complete PVE Tool List
+
+**Initial Setup**
+- `post-pve-install.sh` - Post-installation configuration
+- `post-pbs-install.sh` - Post Backup Server setup
+- `post-pmg-install.sh` - Post Mail Gateway setup
+
+**System Updates**
+- `update-lxcs.sh` - Update all LXC containers
+- `update-lxcs-cron.sh` - Schedule automatic LXC updates
+- `cron-update-lxcs.sh` - Cron job for updates
+- `update-apps.sh` - Update applications in containers
+- `update-repo.sh` - Update repository sources
+
+**Kernel Management**
+- `microcode.sh` - Install Intel/AMD microcode
+- `pbs_microcode.sh` - Microcode for Backup Server
+- `kernel-clean.sh` - Remove old kernels
+- `kernel-pin.sh` - Pin kernel version
+
+**Upgrades**
+- `pve8-upgrade.sh` - Upgrade to Proxmox VE 8
+- `pbs3-upgrade.sh` - Upgrade to PBS 3
+- `pbs4-upgrade.sh` - Upgrade to PBS 4
+
+**Hardware Configuration**
+- `hw-acceleration.sh` - GPU passthrough setup
+- `usb-passthrough.sh` - USB device passthrough
+- `frigate-support.sh` - Enable Frigate NVR support
+- `scaling-governor.sh` - CPU frequency scaling
+
+**Storage & Backup**
+- `host-backup.sh` - Backup Proxmox host config
+- `fstrim.sh` - Enable TRIM for SSDs
+- `clean-orphaned-lvm.sh` - Clean orphaned LVM volumes
+- `container-restore-from-backup.sh` - Restore container
+- `core-restore-from-backup.sh` - Restore core config
+
+**Container Management**
+- `lxc-delete.sh` - Bulk delete containers
+- `clean-lxcs.sh` - Clean stopped containers
+- `execute.sh` - Execute commands in all containers
+- `monitor-all.sh` - Monitor all containers
+
+**Network & System**
+- `nic-offloading-fix.sh` - Fix NIC offload issues
+- `add-iptag.sh` - Add IP tags to containers
+- `pve-privilege-converter.sh` - Convert privileges
+
+<Warning>
+PVE tools modify the Proxmox host system. Always review what a tool does before running it.
+</Warning>
+
+## Popular Tool Examples
+
+### Netdata Monitoring
+
+Add real-time monitoring to any container:
+
+```bash
+# Enter your container
+pct enter 100
+
+# Install Netdata
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/netdata.sh)"
+
+# Access at http://container-ip:19999
+```
+
+### Post-Install Optimization
+
+Optimize a fresh Proxmox installation:
+
+```bash
+# On Proxmox host
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/post-pve-install.sh)"
+```
+
+This script:
+- Configures repositories
+- Removes subscription nag
+- Updates the system
+- Installs useful utilities
+- Optimizes settings
+
+### Update All Containers
+
+Keep all LXC containers updated:
+
+```bash
+# Manual update of all containers
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs.sh)"
+
+# Or schedule automatic updates
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs-cron.sh)"
+```
+
+### Enable Hardware Acceleration
+
+Setup GPU passthrough for containers:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/hw-acceleration.sh)"
+```
+
+Supports:
+- Intel QuickSync
+- AMD AMF
+- NVIDIA GPUs (with additional setup)
+
+<Tip>
+Run hardware acceleration setup before creating media server containers like Plex, Jellyfin, or Frigate.
+</Tip>
+
+## Data Migration Tools
+
+Copy data between containers when migrating applications:
+
+Located in `tools/copy-data/`:
+
+- `home-assistant-core-copy-data-home-assistant-core.sh`
+- `home-assistant-core-copy-data-home-assistant-container.sh`
+- `home-assistant-container-copy-data-home-assistant-core.sh`
+- `home-assistant-container-copy-data-home-assistant-container.sh`
+- `home-assistant-container-copy-data-podman-home-assistant.sh`
+- `podman-home-assistant-copy-data-home-assistant-container.sh`
+- `plex-copy-data-plex.sh`
+- `z2m-copy-data-z2m.sh` - Zigbee2MQTT
+- `zwavejs2mqtt-copy-data-zwavejsui.sh` - Z-Wave JS
+
+```bash
+# Example: Migrate Home Assistant data
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/copy-data/home-assistant-core-copy-data-home-assistant-container.sh)"
+```
+
+## Best Practices
+
+1. **Review Before Running**: Check what a tool does on GitHub before executing
+2. **Test in Non-Production**: Try tools on test systems first
+3. **Backup First**: Create backups before major changes
+4. **Read Output**: Pay attention to script messages and warnings
+5. **Check Requirements**: Ensure your system meets tool requirements
+
+## Next Steps
+
+- Schedule regular [container updates](/usage/update-scripts)
+- Configure monitoring with Netdata or Glances
+- Set up automated backups
+- Join the community for tool recommendations

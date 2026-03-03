@@ -1,0 +1,435 @@
+---
+title: Common Issues
+description: Frequently encountered issues and their solutions
+---
+
+## Container Creation Issues
+
+<AccordionGroup>
+  <Accordion title="CTID already in use (Exit Code 206)">
+    **Problem:** Attempting to create a container with an ID that already exists.
+
+    **Symptoms:**
+    - Error message: "CTID already in use"
+    - Exit code 206
+
+    **Solutions:**
+    1. Check existing containers:
+       ```bash
+       pct list
+       ```
+
+    2. Check for ghost containers:
+       ```bash
+       ls /etc/pve/lxc/
+       ```
+
+    3. Choose a different CTID (≥100, as 1-99 are reserved for Proxmox)
+
+    <Note>
+      If you see a container in `/etc/pve/lxc/` but not in `pct list`, you have a ghost container. Remove the config file manually and retry.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Template download failed (Exit Code 222)">
+    **Problem:** Template cannot be downloaded after multiple attempts.
+
+    **Common Causes:**
+    - Network connectivity issues
+    - Storage space problems
+    - Corrupted template cache
+
+    **Solutions:**
+    1. Check internet connectivity:
+       ```bash
+       ping -c 3 download.proxmox.com
+       ```
+
+    2. Verify storage space:
+       ```bash
+       pvesm status
+       df -h
+       ```
+
+    3. Update template list and retry:
+       ```bash
+       pveam update
+       pveam download <storage> <template>
+       ```
+
+    4. Delete corrupted template (if exists):
+       ```bash
+       # Check template location first
+       pveam list <storage>
+       # Remove corrupted template
+       rm /var/lib/vz/template/cache/<template-file>
+       ```
+  </Accordion>
+
+  <Accordion title="Password contains special characters (Exit Code 207)">
+    **Problem:** Password validation fails due to unescaped special characters.
+
+    **Symptoms:**
+    - Exit code 207
+    - Error about password format
+
+    **Problematic Characters:**
+    Special characters at the start or end: `-`, `/`, `\`, `*`, `!`, `@`
+
+    **Solutions:**
+    1. Use alphanumeric passwords
+    2. Avoid leading/trailing special characters
+    3. Use strong passwords with mixed case, numbers, and letters
+
+    <Warning>
+      While the scripts will validate passwords, always use strong, unique passwords for production containers.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Not enough storage space (Exit Code 214)">
+    **Problem:** Insufficient storage space for container creation.
+
+    **Solutions:**
+    1. Check available storage:
+       ```bash
+       pvesm status
+       df -h
+       ```
+
+    2. Free up space:
+       ```bash
+       # Remove old backups
+       ls -lh /var/lib/vz/dump/
+       
+       # Remove unused templates
+       pveam list local
+       
+       # Clean up old logs
+       journalctl --vacuum-time=7d
+       ```
+
+    3. Use a different storage location with more space
+    4. Increase storage allocation if using thin provisioning
+  </Accordion>
+
+  <Accordion title="Storage does not support rootdir (Exit Code 217)">
+    **Problem:** Selected storage type doesn't support LXC containers.
+
+    **Incompatible Storage Types:**
+    - `iscsidirect` (VMs only)
+    - `cephfs` (use RBD instead)
+    - `pbs` (backups only)
+
+    **Compatible Storage Types:**
+    - `dir` (directory)
+    - `zfspool`
+    - `lvm-thin`
+    - `rbd` (Ceph RBD)
+
+    **Solution:**
+    Select a compatible storage type when creating the container.
+  </Accordion>
+</AccordionGroup>
+
+## Debian 13.1 Template Issues
+
+<Accordion title='Unsupported Debian version "13.1"'>
+  **Problem:**
+  ```
+  TASK ERROR: unable to create CT 129 - unsupported debian version '13.1'
+  ```
+
+  **Root Cause:** Outdated `pve-container` package doesn't recognize Debian 13 (Trixie).
+
+  **Solutions:**
+
+  ### Option 1: Full System Upgrade (Recommended)
+  ```bash
+  apt update
+  apt full-upgrade -y
+  reboot
+  ```
+
+  Verify the fix:
+  ```bash
+  dpkg -l pve-container
+  # PVE 8: Should show 5.3.3+
+  # PVE 9: Should show 6.0.13+
+  ```
+
+  ### Option 2: Update Only pve-container
+  ```bash
+  apt update
+  apt install --only-upgrade pve-container -y
+  ```
+
+  <Warning>
+    If Proxmox fails to boot after this, your system was inconsistent. Perform Option 1 instead.
+  </Warning>
+
+  ### Option 3: Verify Repository Configuration
+
+  Many users disable Enterprise repos but forget to add no-subscription repos.
+
+  **For PVE 9 (Trixie):**
+  ```bash
+  cat /etc/apt/sources.list.d/pve-no-subscription.list
+  ```
+
+  Should contain:
+  ```
+  deb http://download.proxmox.com/debian/pve trixie pve-no-subscription
+  deb http://download.proxmox.com/debian/ceph-squid trixie no-subscription
+  ```
+
+  **For PVE 8 (Bookworm):**
+  ```
+  deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription
+  deb http://download.proxmox.com/debian/ceph-quincy bookworm no-subscription
+  ```
+
+  Then:
+  ```bash
+  apt update
+  apt full-upgrade -y
+  ```
+</Accordion>
+
+## Package Management Issues
+
+<AccordionGroup>
+  <Accordion title="APT package manager errors (Exit Code 100)">
+    **Problem:** Broken packages or dependency conflicts.
+
+    **Solutions:**
+    ```bash
+    # Fix broken packages
+    apt --fix-broken install
+    
+    # Reconfigure all packages
+    dpkg --configure -a
+    
+    # Update package lists
+    apt update
+    
+    # Try installation again
+    apt upgrade
+    ```
+  </Accordion>
+
+  <Accordion title="APT configuration error (Exit Code 101)">
+    **Problem:** Malformed sources.list or bad repository configuration.
+
+    **Solutions:**
+    1. Check sources.list:
+       ```bash
+       cat /etc/apt/sources.list
+       cat /etc/apt/sources.list.d/*.list
+       ```
+
+    2. Fix syntax errors in repository files
+    3. Remove duplicate or conflicting repositories
+    4. Run apt update to verify:
+       ```bash
+       apt update
+       ```
+  </Accordion>
+
+  <Accordion title="DPKG lock held by another process (Exit Code 102)">
+    **Problem:** Another package manager process is running.
+
+    **Solutions:**
+    1. Wait for the other process to complete
+    2. Check running processes:
+       ```bash
+       ps aux | grep -E 'apt|dpkg'
+       ```
+
+    3. If no process is running but lock persists:
+       ```bash
+       rm /var/lib/dpkg/lock-frontend
+       rm /var/lib/dpkg/lock
+       dpkg --configure -a
+       ```
+
+    <Warning>
+      Only remove lock files if you're certain no package manager is running.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Cluster and Network Issues
+
+<AccordionGroup>
+  <Accordion title="Cluster not quorate (Exit Code 210)">
+    **Problem:** Cluster doesn't have enough nodes online to maintain quorum.
+
+    **Check Status:**
+    ```bash
+    pvecm status
+    ```
+
+    **Solutions:**
+    1. Bring offline nodes back online
+    2. Fix network connectivity between nodes
+    3. For development/testing with single node:
+       ```bash
+       pvecm expected 1
+       ```
+
+    <Note>
+      Setting expected votes to 1 should only be done temporarily for testing or during node maintenance.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Container has no IP address (Exit Code 118)">
+    **Problem:** Container started but didn't receive an IP address.
+
+    **Solutions:**
+    1. Verify container network configuration:
+       ```bash
+       pct config <CTID>
+       ```
+
+    2. Check DHCP server if using DHCP
+    3. Set static IP:
+       ```bash
+       pct set <CTID> -net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,gw=192.168.1.1
+       ```
+
+    4. Restart container:
+       ```bash
+       pct restart <CTID>
+       ```
+  </Accordion>
+
+  <Accordion title="No internet connectivity (Exit Code 122)">
+    **Problem:** Container cannot reach the internet.
+
+    **Diagnostic Steps:**
+    ```bash
+    # Enter container
+    pct enter <CTID>
+    
+    # Test connectivity
+    ping 8.8.8.8
+    
+    # Test DNS resolution
+    ping google.com
+    
+    # Check routing
+    ip route
+    
+    # Check DNS configuration
+    cat /etc/resolv.conf
+    ```
+
+    **Common Solutions:**
+    1. Verify gateway configuration
+    2. Check firewall rules on host
+    3. Verify DNS servers are set correctly
+    4. Check if NAT is configured properly on host
+  </Accordion>
+</AccordionGroup>
+
+## Application-Specific Issues
+
+<AccordionGroup>
+  <Accordion title="Database connection failed">
+    **PostgreSQL (Exit Code 170):**
+    ```bash
+    # Check if service is running
+    systemctl status postgresql
+    
+    # Start if needed
+    systemctl start postgresql
+    
+    # Verify connection
+    psql -U postgres
+    ```
+
+    **MySQL/MariaDB (Exit Code 180):**
+    ```bash
+    # Check if service is running
+    systemctl status mysql
+    
+    # Start if needed
+    systemctl start mysql
+    
+    # Verify connection
+    mysql -u root -p
+    ```
+
+    **MongoDB (Exit Code 190):**
+    ```bash
+    # Check if service is running
+    systemctl status mongod
+    
+    # Start if needed
+    systemctl start mongod
+    
+    # Verify connection
+    mongosh
+    ```
+  </Accordion>
+
+  <Accordion title="Node.js out of memory (Exit Code 243)">
+    **Problem:** JavaScript heap exhausted during installation or runtime.
+
+    **Solutions:**
+    1. Increase memory limit:
+       ```bash
+       export NODE_OPTIONS="--max-old-space-size=4096"
+       ```
+
+    2. Allocate more RAM to the container
+    3. Optimize application code to use less memory
+  </Accordion>
+
+  <Accordion title="Python installation aborted (Exit Code 162)">
+    **Problem:** Python package installation blocked by EXTERNALLY-MANAGED marker.
+
+    **Solutions:**
+    1. Use virtual environment (recommended):
+       ```bash
+       python3 -m venv venv
+       source venv/bin/activate
+       pip install <package>
+       ```
+
+    2. Use `--break-system-packages` flag (use with caution):
+       ```bash
+       pip install --break-system-packages <package>
+       ```
+
+    <Warning>
+      Using `--break-system-packages` can conflict with system packages. Always prefer virtual environments.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## General Troubleshooting Steps
+
+1. **Check the logs** - See [Logs](/troubleshooting/logs) for log locations
+2. **Enable debug mode** - See [Debug Mode](/troubleshooting/debug-mode) for verbose output
+3. **Verify exit code** - See [Exit Codes](/troubleshooting/exit-codes) for detailed meanings
+4. **Check system resources** - Ensure adequate CPU, RAM, and disk space
+5. **Review recent changes** - Check if recent updates or configuration changes caused the issue
+
+## Getting Help
+
+If you're still experiencing issues:
+
+1. Collect relevant logs and error messages
+2. Note the exit code and error description
+3. Document steps to reproduce the issue
+4. Open an issue on [GitHub](https://github.com/community-scripts/ProxmoxVE/issues)
+
+<Note>
+  When reporting issues, always include:
+  - Proxmox VE version
+  - Script name and version
+  - Complete error message and exit code
+  - Relevant log excerpts
+  - Steps to reproduce
+</Note>

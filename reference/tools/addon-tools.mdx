@@ -1,0 +1,492 @@
+---
+title: Addon Tools
+description: Scripts to add networking, monitoring, and management capabilities to existing LXC containers
+---
+
+Addon tools enhance existing LXC containers with additional functionality like VPN networking, monitoring systems, and management interfaces. These scripts modify running containers to add new capabilities.
+
+## Networking Addons
+
+### Tailscale
+
+Add Tailscale VPN to an existing LXC container:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/add-tailscale-lxc.sh)"
+```
+
+<Accordion title="What it does">
+1. Prompts for container selection from a list of running containers
+2. Adds required kernel modules to container configuration
+3. Enables TUN device access
+4. Installs Tailscale inside the container
+5. Provides authentication URL for Tailscale setup
+</Accordion>
+
+<Warning>
+This script must be run on the Proxmox VE **host**, not inside the container. It modifies container configuration files that are only accessible from the host.
+</Warning>
+
+**Post-installation:**
+
+After the script completes, authenticate Tailscale:
+
+```bash
+pct exec <container-id> -- tailscale up
+```
+
+Or enter the container and run:
+
+```bash
+lxc-attach <container-id>
+tailscale up
+```
+
+### Netbird
+
+Add Netbird VPN to an existing LXC container:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/add-netbird-lxc.sh)"
+```
+
+Similar to Tailscale, this script:
+- Adds TUN device support
+- Configures container for VPN functionality
+- Installs Netbird client
+- Provides setup instructions
+
+<Note>
+Both Tailscale and Netbird require unprivileged containers. Privileged containers have full TUN/TAP access by default.
+</Note>
+
+## Monitoring Addons
+
+### Netdata
+
+Install Netdata real-time monitoring in a container:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/netdata.sh)"
+```
+
+<CardGroup cols={2}>
+  <Card title="Real-time Metrics" icon="chart-line">
+    CPU, memory, disk I/O, network traffic with per-second granularity
+  </Card>
+  <Card title="Web Interface" icon="browser">
+    Access at `http://container-ip:19999` after installation
+  </Card>
+  <Card title="Zero Configuration" icon="wand-magic-sparkles">
+    Auto-detects services and starts monitoring immediately
+  </Card>
+  <Card title="Alerting" icon="bell">
+    Built-in health checks and notification system
+  </Card>
+</CardGroup>
+
+**Features:**
+- Real-time performance monitoring
+- Beautiful web dashboard
+- Low resource usage
+- Automatic service detection
+- Cloud integration available
+
+### Glances
+
+Install Glances cross-platform monitoring tool:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/glances.sh)"
+```
+
+<Accordion title="Glances Features">
+- **Terminal UI**: Beautiful ncurses interface for terminal monitoring
+- **Web UI**: HTTP server mode for browser-based access
+- **REST API**: Programmatic access to metrics
+- **Plugins**: Extensible architecture for custom monitoring
+- **Export**: Send metrics to InfluxDB, Prometheus, and more
+</Accordion>
+
+**Access methods:**
+
+```bash
+# Terminal mode (inside container)
+glances
+
+# Web mode
+glances -w
+# Access at http://container-ip:61208
+
+# API mode
+glances -w --disable-webui
+```
+
+## Container Management Addons
+
+### Webmin
+
+Add Webmin web-based system administration:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/webmin.sh)"
+```
+
+Webmin provides:
+- Web-based system configuration
+- User and group management
+- Service control
+- File management
+- Log viewer
+- Package management
+
+**Access:** `https://container-ip:10000`
+
+### OliveTin
+
+Add OliveTin for safe web-based command execution:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/olivetin.sh)"
+```
+
+OliveTin allows you to:
+- Create buttons for common commands
+- Provide web access to scripts without SSH
+- Control command execution with confirmation dialogs
+- Limit access to specific operations
+
+## Development Tools
+
+### Coder Code-Server
+
+Install VS Code in the browser:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/coder-code-server.sh)"
+```
+
+Code-server provides:
+- Full VS Code experience in the browser
+- Extension support
+- Terminal access
+- Git integration
+- Multi-user support with authentication
+
+**Access:** `http://container-ip:8080`
+
+### PyEnv
+
+Install PyEnv for Python version management:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/pyenv.sh)"
+```
+
+Manage multiple Python versions:
+
+```bash
+# List available versions
+pyenv install --list
+
+# Install Python version
+pyenv install 3.11.0
+
+# Set global version
+pyenv global 3.11.0
+
+# Set local version for directory
+pyenv local 3.9.0
+```
+
+## Platform Management Addons
+
+### Docker Management
+
+<CardGroup cols={2}>
+  <Card title="Dockge" icon="docker">
+    Docker Compose stack manager with web UI
+  </Card>
+  <Card title="Dokploy" icon="ship">
+    Self-hosted PaaS alternative to Vercel/Netlify
+  </Card>
+  <Card title="Coolify" icon="server">
+    Self-hosted Heroku/Netlify alternative
+  </Card>
+  <Card title="RunTipi" icon="box">
+    App store for self-hosted applications
+  </Card>
+</CardGroup>
+
+#### Dockge
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/dockge.sh)"
+```
+
+Features:
+- Manage Docker Compose stacks via web UI
+- Interactive compose file editor
+- Stack management (start/stop/restart/update)
+- Real-time logs
+- Multiple stack support
+
+#### Dokploy
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/dokploy.sh)"
+```
+
+#### Coolify
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/coolify.sh)"
+```
+
+#### RunTipi
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/runtipi.sh)"
+```
+
+### Task Automation
+
+#### Cronmaster
+
+Advanced cron job management interface:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/cronmaster.sh)"
+```
+
+Features:
+- Visual cron job editor
+- Job history and logging
+- Email notifications
+- Job templates
+- Multi-user support
+
+## Database Management
+
+### phpMyAdmin
+
+Web interface for MySQL/MariaDB administration:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/phpmyadmin.sh)"
+```
+
+<Accordion title="phpMyAdmin Features">
+- Database creation and management
+- Table operations (create, alter, drop)
+- SQL query execution and history
+- Import/Export functionality (SQL, CSV, XML)
+- User and privilege management
+- Visual query builder
+- Database search
+</Accordion>
+
+<Warning>
+Secure your phpMyAdmin installation:
+- Use strong passwords
+- Enable HTTPS
+- Restrict access by IP if possible
+- Keep phpMyAdmin updated
+</Warning>
+
+## File Management
+
+### FileBrowser
+
+Web-based file manager:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/filebrowser.sh)"
+```
+
+### FileBrowser Quantum
+
+Enhanced version with additional features:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/filebrowser-quantum.sh)"
+```
+
+Features:
+- File upload/download
+- File editing
+- User management
+- Share creation
+- Command execution
+- Custom branding
+
+### CopyParty
+
+File sharing server with upload support:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/copyparty.sh)"
+```
+
+## Security Addons
+
+### CrowdSec
+
+Install CrowdSec collaborative security:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/crowdsec.sh)"
+```
+
+CrowdSec provides:
+- Real-time threat detection
+- Collaborative IP reputation
+- Automatic ban of malicious IPs
+- Integration with firewalls
+- Support for many scenarios (SSH, HTTP, etc.)
+
+## Specialized Service Addons
+
+### Monitoring Exporters
+
+Prometheus exporters for various services:
+
+<CardGroup cols={2}>
+  <Card title="Pi-hole Exporter" icon="shield">
+    Export Pi-hole metrics to Prometheus
+  </Card>
+  <Card title="Nextcloud Exporter" icon="cloud">
+    Monitor Nextcloud instance metrics
+  </Card>
+  <Card title="qBittorrent Exporter" icon="download">
+    Track qBittorrent statistics
+  </Card>
+  <Card title="Paperless-ngx Exporter" icon="file">
+    Export document management metrics
+  </Card>
+</CardGroup>
+
+#### Pi-hole Exporter
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/pihole-exporter.sh)"
+```
+
+#### Nextcloud Exporter
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/nextcloud-exporter.sh)"
+```
+
+#### qBittorrent Exporter
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/qbittorrent-exporter.sh)"
+```
+
+#### Paperless-ngx Exporter
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/prometheus-paperless-ngx-exporter.sh)"
+```
+
+### Media Server Addons
+
+#### JellyStat
+
+Statistics and analytics for Jellyfin:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/jellystat.sh)"
+```
+
+Features:
+- Track watch history
+- User statistics
+- Library insights
+- Play activity graphs
+- Geographic data
+
+#### Immich Public Proxy
+
+Public sharing for Immich photos:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/immich-public-proxy.sh)"
+```
+
+### Synchronization Tools
+
+#### AdGuard Home Sync
+
+Synchronize configurations between AdGuard Home instances:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/adguardhome-sync.sh)"
+```
+
+Useful for:
+- High availability setups
+- Multi-location deployments
+- Backup configurations
+- Consistent settings across instances
+
+### Infrastructure Tools
+
+#### Komodo
+
+Infrastructure automation and monitoring:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/komodo.sh)"
+```
+
+#### Arcane
+
+Container and service orchestration:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/arcane.sh)"
+```
+
+## Template Management
+
+### All Templates
+
+Download all available LXC templates:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/all-templates.sh)"
+```
+
+<Note>
+This script downloads all official Proxmox LXC templates to your local storage, making container creation faster and enabling offline deployments.
+</Note>
+
+## Best Practices
+
+<Accordion title="Before Installing Addons">
+1. **Backup your container**: Create a snapshot or backup before making changes
+2. **Check compatibility**: Ensure your container OS is supported
+3. **Resource allocation**: Verify container has adequate CPU/RAM for the addon
+4. **Network access**: Ensure container can reach the internet for downloads
+5. **Review changes**: Understand what the script will modify
+</Accordion>
+
+<Accordion title="Security Considerations">
+- Change default passwords immediately after installation
+- Configure firewalls to restrict access to web interfaces
+- Use HTTPS with valid certificates for production deployments
+- Keep addons updated regularly
+- Review logs periodically for suspicious activity
+</Accordion>
+
+<Accordion title="Troubleshooting">
+If an addon installation fails:
+
+1. Check container status: `pct status <container-id>`
+2. Review container logs: `pct exec <container-id> -- journalctl -xe`
+3. Verify network connectivity: `pct exec <container-id> -- ping -c 3 google.com`
+4. Check disk space: `pct exec <container-id> -- df -h`
+5. Review script output for specific error messages
+</Accordion>

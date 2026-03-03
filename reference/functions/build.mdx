@@ -1,0 +1,412 @@
+---
+title: Build Functions
+description: LXC container build and configuration functions for Proxmox VE
+---
+
+The `build.func` library provides the main build functions for creating and configuring LXC containers in Proxmox VE. It handles variable initialization, container creation, resource allocation, storage selection, and advanced configuration.
+
+## Core Functions
+
+### variables()
+
+Initializes core variables for container creation.
+
+<ParamField path="NSAPP" type="string">
+  Normalized application name (lowercase, no spaces)
+</ParamField>
+
+<ParamField path="var_install" type="string">
+  Installer filename (`{nsapp}-install`)
+</ParamField>
+
+<ParamField path="SESSION_ID" type="string">
+  Unique 8-character session ID for logging
+</ParamField>
+
+<ParamField path="BUILD_LOG" type="string">
+  Host-side container creation log path
+</ParamField>
+
+```bash build.func:40-84
+variables() {
+  NSAPP=$(echo "${APP,,}" | tr -d ' ')              # Convert to lowercase, remove spaces
+  var_install="${NSAPP}-install"                    # Build installer filename
+  INTEGER='^[0-9]+([.][0-9]+)?$'                    # Regex pattern for validation
+  PVEHOST_NAME=$(hostname)                          # Proxmox hostname
+  DIAGNOSTICS="no"                                  # Default: no telemetry
+  METHOD="default"                                  # API method
+  RANDOM_UUID="$(cat /proc/sys/kernel/random/uuid)" # Generate UUID
+  EXECUTION_ID="${RANDOM_UUID}"                     # Unique execution ID
+  SESSION_ID="${RANDOM_UUID:0:8}"                   # Short session ID
+  BUILD_LOG="/tmp/create-lxc-${SESSION_ID}.log"     # Log file path
+  CTTYPE="${CTTYPE:-${CT_TYPE:-1}}"                # Container type
+
+  # Get Proxmox VE version
+  if command -v pveversion >/dev/null 2>&1; then
+    PVEVERSION="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
+  fi
+}
+```
+
+## Validation Functions
+
+### maxkeys_check()
+
+Checks kernel keyring limits and usage for LXC containers.
+
+<Accordion title="Kernel Keyring Limits">
+  Reads `/proc/sys/kernel/keys/maxkeys` and `/proc/sys/kernel/keys/maxbytes` to ensure the container can be created without exceeding kernel limits.
+</Accordion>
+
+```bash build.func:114-155
+maxkeys_check() {
+  # Read kernel parameters
+  per_user_maxkeys=$(cat /proc/sys/kernel/keys/maxkeys 2>/dev/null || echo 0)
+  per_user_maxbytes=$(cat /proc/sys/kernel/keys/maxbytes 2>/dev/null || echo 0)
+
+  # Fetch key usage for user ID 100000 (typical for containers)
+  used_lxc_keys=$(awk '/100000:/ {print $2}' /proc/key-users 2>/dev/null || echo 0)
+  used_lxc_bytes=$(awk '/100000:/ {split($5, a, "/"); print a[1]}' /proc/key-users 2>/dev/null || echo 0)
+
+  # Calculate thresholds
+  threshold_keys=$((per_user_maxkeys - 100))
+  threshold_bytes=$((per_user_maxbytes - 1000))
+  new_limit_keys=$((per_user_maxkeys * 2))
+  new_limit_bytes=$((per_user_maxbytes * 2))
+
+  # Check if usage is near limits
+  if [[ "$used_lxc_keys" -gt "$threshold_keys" ]]; then
+    msg_warn "Key usage is near the limit (${used_lxc_keys}/${per_user_maxkeys})"
+    echo -e "${INFO} Suggested action: Set ${GN}kernel.keys.maxkeys=${new_limit_keys}${CL} in ${BOLD}/etc/sysctl.d/98-community-scripts.conf${CL}."
+    exit 108
+  fi
+}
+```
+
+### validate_container_id()
+
+Validates if a container ID is available cluster-wide.
+
+<ParamField path="ctid" type="number" required>
+  Container ID to validate (must be >= 100)
+</ParamField>
+
+<ParamField path="return" type="number">
+  Returns 0 if ID is available, 1 if already in use
+</ParamField>
+
+```bash build.func:288-331
+validate_container_id() {
+  local ctid="$1"
+
+  # Check if ID is numeric
+  if ! [[ "$ctid" =~ ^[0-9]+$ ]]; then
+    return 1
+  fi
+
+  # CLUSTER-WIDE CHECK: Query all VMs/CTs across all nodes
+  if command -v pvesh &>/dev/null; then
+    local cluster_ids
+    cluster_ids=$(pvesh get /cluster/resources --type vm --output-format json 2>/dev/null |
+      grep -oP '"vmid":\s*\K[0-9]+' 2>/dev/null || true)
+    if [[ -n "$cluster_ids" ]] && echo "$cluster_ids" | grep -qw "$ctid"; then
+      return 1
+    fi
+  fi
+
+  # LOCAL FALLBACK: Check if config file exists
+  if [[ -f "/etc/pve/qemu-server/${ctid}.conf" ]] || [[ -f "/etc/pve/lxc/${ctid}.conf" ]]; then
+    return 1
+  fi
+
+  # Check if ID is used in LVM logical volumes
+  if lvs --noheadings -o lv_name 2>/dev/null | grep -qE "(^|[-_])${ctid}($|[-_])"; then
+    return 1
+  fi
+
+  return 0
+}
+```
+
+## Network Validation Functions
+
+### validate_hostname()
+
+Validates hostname/FQDN according to RFC 1123/952.
+
+<ParamField path="hostname" type="string" required>
+  Hostname or FQDN to validate (max 253 characters)
+</ParamField>
+
+```bash build.func:366-395
+validate_hostname() {
+  local hostname="$1"
+
+  # Check total length (max 253 for FQDN)
+  if [[ ${#hostname} -gt 253 ]] || [[ -z "$hostname" ]]; then
+    return 1
+  fi
+
+  # Split by dots and validate each label
+  local IFS='.'
+  read -ra labels <<<"$hostname"
+  for label in "${labels[@]}"; do
+    # Each label: 1-63 chars, alphanumeric, hyphens allowed (not at start/end)
+    if [[ -z "$label" ]] || [[ ${#label} -gt 63 ]]; then
+      return 1
+    fi
+    if [[ ! "$label" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] && [[ ! "$label" =~ ^[a-z0-9]$ ]]; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+```
+
+### validate_ip_address()
+
+Validates IPv4 address with CIDR notation.
+
+<ParamField path="ip" type="string" required>
+  IPv4 address with CIDR (e.g., `192.168.1.100/24`)
+</ParamField>
+
+```bash build.func:559-587
+validate_ip_address() {
+  local ip="$1"
+  [[ -z "$ip" ]] && return 1
+
+  # Check format with CIDR
+  if [[ ! "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/([0-9]{1,2})$ ]]; then
+    return 1
+  fi
+
+  local o1="${BASH_REMATCH[1]}"
+  local o2="${BASH_REMATCH[2]}"
+  local o3="${BASH_REMATCH[3]}"
+  local o4="${BASH_REMATCH[4]}"
+  local cidr="${BASH_REMATCH[5]}"
+
+  # Validate octets (0-255)
+  for octet in "$o1" "$o2" "$o3" "$o4"; do
+    if ((octet > 255)); then
+      return 1
+    fi
+  done
+
+  # Validate CIDR (1-32)
+  if ((cidr < 1 || cidr > 32)); then
+    return 1
+  fi
+
+  return 0
+}
+```
+
+## Storage Management
+
+### choose_and_set_storage_for_file()
+
+Selects storage for containers or templates.
+
+<ParamField path="vars_file" type="string" required>
+  Path to vars file to update
+</ParamField>
+
+<ParamField path="class" type="string" required>
+  Storage class: `container` or `template`
+</ParamField>
+
+<CodeGroup>
+```bash Container Storage
+choose_and_set_storage_for_file "/usr/local/community-scripts/default.vars" "container"
+```
+
+```bash Template Storage
+choose_and_set_storage_for_file "/usr/local/community-scripts/default.vars" "template"
+```
+</CodeGroup>
+
+## Configuration Management
+
+### base_settings()
+
+Defines all base/default variables for container creation.
+
+<Accordion title="Configuration Variables Set">
+  - **Container Type**: Privileged (0) or Unprivileged (1)
+  - **Resources**: CPU cores, RAM size, disk size
+  - **Network**: Bridge, IP address, IPv6 method, gateway
+  - **SSH**: SSH access and authorized keys
+  - **Features**: Nesting, keyctl, mknod, FUSE, TUN
+  - **Tags**: Proxmox tags for organization
+</Accordion>
+
+```bash build.func:883-1015
+base_settings() {
+  # Container type
+  CT_TYPE=${var_unprivileged:-"1"}
+
+  # Resource allocation: App defaults take precedence if HIGHER
+  local final_disk="${var_disk:-4}"
+  local final_cpu="${var_cpu:-1}"
+  local final_ram="${var_ram:-1024}"
+
+  # If app declared higher values, use those instead
+  if [[ -n "${APP_DEFAULT_DISK:-}" && "${APP_DEFAULT_DISK}" =~ ^[0-9]+$ ]]; then
+    if [[ "${APP_DEFAULT_DISK}" -gt "${final_disk}" ]]; then
+      final_disk="${APP_DEFAULT_DISK}"
+    fi
+  fi
+
+  DISK_SIZE="${final_disk}"
+  CORE_COUNT="${final_cpu}"
+  RAM_SIZE="${final_ram}"
+
+  # Validate and set Container ID
+  local requested_id="${var_ctid:-$NEXTID}"
+  if ! validate_container_id "$requested_id"; then
+    requested_id=$(get_valid_container_id "$requested_id")
+  fi
+  CT_ID="$requested_id"
+
+  # Network configuration
+  BRG=${var_brg:-"vmbr0"}
+  NET=${var_net:-"dhcp"}
+  IPV6_METHOD=${var_ipv6_method:-"none"}
+  GATE=${var_gateway:-""}
+
+  # SSH and features
+  SSH=${var_ssh:-"no"}
+  TAGS="community-script,${var_tags:-}"
+  ENABLE_NESTING=${var_nesting:-"1"}
+}
+```
+
+### load_vars_file()
+
+Safe parser for KEY=VALUE lines from vars files.
+
+<ParamField path="file" type="string" required>
+  Path to vars file to load
+</ParamField>
+
+<ParamField path="force" type="string" default="no">
+  If `yes`, override existing variables
+</ParamField>
+
+<Expandable title="Whitelisted Variables">
+  Only whitelisted `var_*` keys are loaded for security:
+  - `var_apt_cacher`, `var_apt_cacher_ip`
+  - `var_brg`, `var_cpu`, `var_disk`, `var_ram`
+  - `var_fuse`, `var_gpu`, `var_keyctl`, `var_nesting`
+  - `var_gateway`, `var_hostname`, `var_mac`, `var_mtu`
+  - `var_net`, `var_ns`, `var_pw`, `var_tags`
+  - `var_timezone`, `var_tun`, `var_unprivileged`
+  - `var_ssh`, `var_ssh_authorized_key`
+  - `var_container_storage`, `var_template_storage`
+</Expandable>
+
+## IP Range Scanning
+
+### resolve_ip_from_range()
+
+Scans an IP range to find the first available IP address.
+
+<ParamField path="range" type="string" required>
+  IP range in format `10.0.0.1/24-10.0.0.10/24`
+</ParamField>
+
+<ParamField path="NET_RESOLVED" type="string">
+  Global variable set to the resolved IP with CIDR
+</ParamField>
+
+```bash build.func:747-781
+resolve_ip_from_range() {
+  local range="$1"
+  local ip_start ip_end
+
+  # Parse range: "10.0.0.1/24-10.0.0.10/24"
+  ip_start="${range%%-*}"
+  ip_end="${range##*-}"
+
+  local ip1="${ip_start%%/*}"
+  local ip2="${ip_end%%/*}"
+  local cidr="${ip_start##*/}"
+
+  local start_int=$(ip_to_int "$ip1")
+  local end_int=$(ip_to_int "$ip2")
+
+  for ((ip_int = start_int; ip_int <= end_int; ip_int++)); do
+    local ip=$(int_to_ip $ip_int)
+    msg_info "Checking IP: $ip"
+    if ! ping -c 1 -W 1 "$ip" >/dev/null 2>&1; then
+      NET_RESOLVED="$ip/$cidr"
+      msg_ok "Found free IP: ${BGN}$NET_RESOLVED${CL}"
+      return 0
+    fi
+  done
+
+  NET_RESOLVED=""
+  msg_error "No free IP found in range $range"
+  return 1
+}
+```
+
+## Usage Examples
+
+<CodeGroup>
+```bash Initialize Variables
+# Source the build functions
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+
+# Initialize core variables
+variables
+
+# Check kernel limits
+maxkeys_check
+```
+
+```bash Validate Configuration
+# Validate container ID
+if validate_container_id 100; then
+  echo "Container ID 100 is available"
+fi
+
+# Validate hostname
+if validate_hostname "my-container.local"; then
+  echo "Hostname is valid"
+fi
+
+# Validate IP address
+if validate_ip_address "192.168.1.100/24"; then
+  echo "IP address is valid"
+fi
+```
+
+```bash Load Configuration
+# Load default vars
+default_var_settings
+
+# Load app-specific vars with override
+load_vars_file "/usr/local/community-scripts/defaults/myapp.vars" "yes"
+
+# Apply base settings
+base_settings "yes"  # verbose mode
+```
+</CodeGroup>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Install Functions" icon="download" href="./install">
+    Container installation and setup functions
+  </Card>
+  <Card title="Tools Functions" icon="wrench" href="./tools">
+    Package management and system utilities
+  </Card>
+  <Card title="API Functions" icon="chart-line" href="./api">
+    Telemetry and diagnostics API
+  </Card>
+</CardGroup>

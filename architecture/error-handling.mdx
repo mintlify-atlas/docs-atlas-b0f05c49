@@ -1,0 +1,468 @@
+---
+title: Error Handling
+description: Comprehensive error handling mechanisms with real code examples and exit code reference
+---
+
+## Error Handling Architecture
+
+The Proxmox VE Helper Scripts implement a comprehensive error handling system that ensures proper cleanup, detailed logging, and telemetry reporting for all failures.
+
+## Core Components
+
+### Error Handler Function
+
+The main error handler is triggered by the ERR trap and provides detailed error context:
+
+```bash error_handler.func:232-381
+error_handler() {
+  local exit_code=${1:-$?}
+  local command=${2:-${BASH_COMMAND:-unknown}}
+  local line_number=${BASH_LINENO[0]:-unknown}
+
+  command="${command//\$STD/}"
+
+  if [[ "$exit_code" -eq 0 ]]; then
+    return 0
+  fi
+
+  # Stop spinner and restore cursor FIRST
+  if declare -f stop_spinner >/dev/null 2>&1; then
+    stop_spinner 2>/dev/null || true
+  fi
+  printf "\e[?25h"
+
+  local explanation
+  explanation="$(explain_exit_code "$exit_code")"
+
+  # ALWAYS report failure to API immediately
+  if declare -f post_update_to_api &>/dev/null; then
+    post_update_to_api "failed" "$exit_code" 2>/dev/null || true
+  else
+    # Container context: send status directly via curl
+    _send_abort_telemetry "$exit_code" 2>/dev/null || true
+  fi
+
+  # Display error message
+  if declare -f msg_error >/dev/null 2>&1; then
+    msg_error "in line ${line_number}: exit code ${exit_code} (${explanation}): while executing command ${command}"
+  else
+    echo -e "\n${RD}[ERROR]${CL} in line ${RD}${line_number}${CL}: exit code ${RD}${exit_code}${CL} (${explanation}): while executing command ${YWB}${command}${CL}\n"
+  fi
+
+  # Show last 20 lines of log if available
+  if [[ -n "$active_log" && -s "$active_log" ]]; then
+    echo -e "\n${TAB}--- Last 20 lines of log ---"
+    tail -n 20 "$active_log"
+    echo -e "${TAB}-----------------------------------\n"
+  fi
+
+  # Offer to remove broken container
+  if [[ -n "${CTID:-}" ]] && command -v pct &>/dev/null && pct status "$CTID" &>/dev/null; then
+    echo -en "${YW}Remove broken container ${CTID}? (Y/n) [auto-remove in 60s]: ${CL}"
+    if read -t 60 -r response; then
+      if [[ -z "$response" || "$response" =~ ^[Yy]$ ]]; then
+        pct stop "$CTID" &>/dev/null || true
+        pct destroy "$CTID" &>/dev/null || true
+      fi
+    else
+      # Timeout - auto-remove
+      pct stop "$CTID" &>/dev/null || true
+      pct destroy "$CTID" &>/dev/null || true
+    fi
+  fi
+
+  exit "$exit_code"
+}
+```
+
+### Signal Handlers
+
+<Accordion title="EXIT Trap (on_exit)">
+Runs on **every** script termination to catch orphaned records:
+
+```bash error_handler.func:507-533
+on_exit() {
+  local exit_code=$?
+
+  # Report orphaned "installing" records to telemetry API
+  # Catches ALL exit paths: errors, signals, AND clean exits
+  if [[ "${POST_TO_API_DONE:-}" == "true" && "${POST_UPDATE_DONE:-}" != "true" ]]; then
+    if [[ $exit_code -ne 0 ]]; then
+      _send_abort_telemetry "$exit_code"
+    elif declare -f post_update_to_api >/dev/null 2>&1; then
+      post_update_to_api "done" "0" 2>/dev/null || true
+    fi
+  fi
+
+  # Best-effort log collection on failure
+  if [[ $exit_code -ne 0 ]] && declare -f ensure_log_on_host >/dev/null 2>&1; then
+    ensure_log_on_host 2>/dev/null || true
+  fi
+
+  # Stop orphaned container if exiting with error
+  if [[ $exit_code -ne 0 ]]; then
+    _stop_container_if_installing
+  fi
+
+  [[ -n "${lockfile:-}" && -e "$lockfile" ]] && rm -f "$lockfile"
+  exit "$exit_code"
+}
+```
+
+**Why it's critical**: Prevents records from being stuck in "installing" or "configuring" states forever.
+</Accordion>
+
+<Accordion title="INT Trap (on_interrupt) - Ctrl+C">
+Handles user interruption via Ctrl+C:
+
+```bash error_handler.func:543-558
+on_interrupt() {
+  # Stop spinner and restore cursor before any output
+  if declare -f stop_spinner >/dev/null 2>&1; then
+    stop_spinner 2>/dev/null || true
+  fi
+  printf "\e[?25h" 2>/dev/null || true
+
+  _send_abort_telemetry "130"
+  _stop_container_if_installing
+  if declare -f msg_error >/dev/null 2>&1; then
+    msg_error "Interrupted by user (SIGINT)" 2>/dev/null || true
+  else
+    echo -e "\n${RD}Interrupted by user (SIGINT)${CL}" 2>/dev/null || true
+  fi
+  exit 130
+}
+```
+
+**Exit code**: 130 (128 + SIGINT signal number 2)
+</Accordion>
+
+<Accordion title="TERM Trap (on_terminate) - Process Kill">
+Handles process termination via kill command:
+
+```bash error_handler.func:568-583
+on_terminate() {
+  # Stop spinner and restore cursor before any output
+  if declare -f stop_spinner >/dev/null 2>&1; then
+    stop_spinner 2>/dev/null || true
+  fi
+  printf "\e[?25h" 2>/dev/null || true
+
+  _send_abort_telemetry "143"
+  _stop_container_if_installing
+  if declare -f msg_error >/dev/null 2>&1; then
+    msg_error "Terminated by signal (SIGTERM)" 2>/dev/null || true
+  else
+    echo -e "\n${RD}Terminated by signal (SIGTERM)${CL}" 2>/dev/null || true
+  fi
+  exit 143
+}
+```
+
+**Exit code**: 143 (128 + SIGTERM signal number 15)
+</Accordion>
+
+<Accordion title="HUP Trap (on_hangup) - SSH Disconnect">
+Handles terminal disconnection (SSH session closed):
+
+```bash error_handler.func:596-605
+on_hangup() {
+  # Stop spinner (no cursor restore needed — terminal is already gone)
+  if declare -f stop_spinner >/dev/null 2>&1; then
+    stop_spinner 2>/dev/null || true
+  fi
+
+  _send_abort_telemetry "129"
+  _stop_container_if_installing
+  exit 129
+}
+```
+
+**Exit code**: 129 (128 + SIGHUP signal number 1)
+
+**Why it's critical**: This was previously missing, causing container processes to become orphans on SSH disconnect — the #1 cause of stuck "installing" and "configuring" states.
+</Accordion>
+
+## Initialization
+
+### `catch_errors()`
+
+Initializes error handling and sets up all traps:
+
+```bash error_handler.func:627-638
+catch_errors() {
+  set -Ee -o pipefail
+  if [ "${STRICT_UNSET:-0}" = "1" ]; then
+    set -u
+  fi
+
+  trap 'error_handler' ERR
+  trap on_exit EXIT
+  trap on_interrupt INT
+  trap on_terminate TERM
+  trap on_hangup HUP
+}
+```
+
+**Bash options**:
+- `set -Ee`: Exit on error, inherit ERR trap in functions
+- `set -o pipefail`: Pipeline fails if any command fails
+- `set -u`: (optional) Exit on undefined variable if STRICT_UNSET=1
+
+## Exit Code Reference
+
+### Exit Code Categories
+
+<Accordion title="Generic/Shell Errors (1-10, 124-146)">
+| Code | Description |
+|------|-------------|
+| 1 | General error / Operation not permitted |
+| 2 | Misuse of shell builtins (syntax error) |
+| 3 | General syntax or argument error |
+| 10 | Docker / privileged mode required |
+| 124 | Command timed out |
+| 126 | Command invoked cannot execute |
+| 127 | Command not found |
+| 130 | Aborted by user (SIGINT/Ctrl+C) |
+| 137 | Killed (SIGKILL / Out of memory) |
+| 139 | Segmentation fault |
+| 143 | Terminated (SIGTERM) |
+</Accordion>
+
+<Accordion title="curl/wget Errors (4-95)">
+| Code | Description |
+|------|-------------|
+| 6 | DNS resolution failed (could not resolve host) |
+| 7 | Failed to connect (network unreachable) |
+| 22 | HTTP error returned (404, 429, 500+) |
+| 28 | Operation timeout (network slow or server not responding) |
+| 35 | SSL/TLS handshake failed (certificate error) |
+| 51 | SSL peer certificate verification failed |
+| 52 | Empty reply from server |
+| 56 | Receive error (connection reset by peer) |
+</Accordion>
+
+<Accordion title="Package Manager Errors (100-102)">
+| Code | Description |
+|------|-------------|
+| 100 | APT: Package manager error (broken packages) |
+| 101 | APT: Configuration error (bad sources.list) |
+| 102 | APT: Lock held by another process |
+</Accordion>
+
+<Accordion title="Script Validation & Setup (103-123)">
+| Code | Description |
+|------|-------------|
+| 103 | Validation: Shell is not Bash |
+| 104 | Validation: Not running as root |
+| 105 | Validation: Proxmox VE version not supported |
+| 106 | Validation: Architecture not supported (ARM/PiMox) |
+| 107 | Validation: Kernel key parameters unreadable |
+| 108 | Validation: Kernel key limits exceeded |
+| 109 | Proxmox: No available container ID after max attempts |
+| 115 | Download: install.func download failed |
+| 116 | Proxmox: Default bridge vmbr0 not found |
+| 117 | LXC: Container did not reach running state |
+| 118 | LXC: No IP assigned to container after timeout |
+| 121 | LXC: Container network not ready (no IP) |
+| 122 | LXC: No internet connectivity — user declined |
+</Accordion>
+
+<Accordion title="Proxmox Custom Codes (200-231)">
+| Code | Description |
+|------|-------------|
+| 203 | Proxmox: Missing CTID variable |
+| 205 | Proxmox: Invalid CTID (less than 100) |
+| 206 | Proxmox: CTID already in use |
+| 207 | Proxmox: Password contains unescaped special characters |
+| 209 | Proxmox: Container creation failed |
+| 211 | Proxmox: Timeout waiting for template lock |
+| 214 | Proxmox: Not enough storage space |
+| 215 | Proxmox: Container created but not listed (ghost state) |
+| 222 | Proxmox: Template download failed |
+</Accordion>
+
+<Accordion title="Database Errors (170-193)">
+| Code | Description |
+|------|-------------|
+| 170 | PostgreSQL: Connection failed |
+| 171 | PostgreSQL: Authentication failed |
+| 180 | MySQL/MariaDB: Connection failed |
+| 181 | MySQL/MariaDB: Authentication failed |
+| 190 | MongoDB: Connection failed |
+| 191 | MongoDB: Authentication failed |
+</Accordion>
+
+<Accordion title="Application Errors (250-254)">
+| Code | Description |
+|------|-------------|
+| 250 | App: Download failed or version not determined |
+| 251 | App: File extraction failed (corrupt archive) |
+| 252 | App: Required file or resource not found |
+| 253 | App: Data migration required — update aborted |
+| 254 | App: User declined prompt or input timed out |
+</Accordion>
+
+## Telemetry Integration
+
+### Failure Reporting
+
+The error handler automatically reports failures to the telemetry API:
+
+```bash error_handler.func:388-469
+_send_abort_telemetry() {
+  local exit_code="${1:-1}"
+  # Try full API function first (host context)
+  if declare -f post_update_to_api &>/dev/null; then
+    post_update_to_api "failed" "$exit_code" 2>/dev/null || true
+    return
+  fi
+  # Fallback: direct curl (container context)
+  command -v curl &>/dev/null || return 0
+  [[ "${DIAGNOSTICS:-no}" == "no" ]] && return 0
+  [[ -z "${RANDOM_UUID:-}" ]] && return 0
+
+  # Collect last 200 log lines for error diagnosis
+  local error_text=""
+  local logfile=""
+  if [[ -n "${INSTALL_LOG:-}" && -s "${INSTALL_LOG}" ]]; then
+    logfile="${INSTALL_LOG}"
+  elif [[ -n "${SILENT_LOGFILE:-}" && -s "${SILENT_LOGFILE}" ]]; then
+    logfile="${SILENT_LOGFILE}"
+  fi
+
+  if [[ -n "$logfile" ]]; then
+    error_text=$(tail -n 200 "$logfile" 2>/dev/null | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\\/\\\\/g; s/"/\\"/g; s/\r//g' | tr '\n' '|' | sed 's/|$//' | head -c 16384 | tr -d '\000-\010\013\014\016-\037\177') || true
+  fi
+
+  # Prepend exit code explanation
+  local explanation=""
+  if declare -f explain_exit_code &>/dev/null; then
+    explanation=$(explain_exit_code "$exit_code" 2>/dev/null) || true
+  fi
+  if [[ -n "$explanation" && -n "$error_text" ]]; then
+    error_text="exit_code=${exit_code} | ${explanation}|---|${error_text}"
+  fi
+
+  # Build JSON payload with error context
+  local payload
+  payload="{\"random_id\":\"${RANDOM_UUID}\",\"execution_id\":\"${EXECUTION_ID:-${RANDOM_UUID}}\",\"type\":\"${TELEMETRY_TYPE:-lxc}\",\"nsapp\":\"${NSAPP:-${app:-unknown}}\",\"status\":\"failed\",\"exit_code\":${exit_code}"
+  [[ -n "$error_text" ]] && payload="${payload},\"error\":\"${error_text}\""
+  payload="${payload}}"
+
+  # 2 attempts (retry once on failure)
+  for attempt in 1 2; do
+    if curl -fsS -m 5 -X POST "$TELEMETRY_URL" \
+      -H "Content-Type: application/json" \
+      -d "$payload" &>/dev/null; then
+      return 0
+    fi
+    [[ $attempt -eq 1 ]] && sleep 1
+  done
+  return 0
+}
+```
+
+**Key features**:
+- Works in both host and container contexts
+- Collects last 200 log lines for diagnosis
+- Includes exit code explanation in error text
+- Retries once on failure
+- Never blocks script execution
+
+## Orphaned Container Prevention
+
+### The Problem
+
+When an installation script is running and the SSH session disconnects (SIGHUP), the container process becomes orphaned and continues running. This causes:
+
+1. Host script exits without updating telemetry status
+2. Container continues installation and sends "configuring" status
+3. Record becomes stuck in "configuring" state forever
+
+### The Solution
+
+```bash error_handler.func:485-490
+_stop_container_if_installing() {
+  [[ "${CONTAINER_INSTALLING:-}" == "true" ]] || return 0
+  [[ -n "${CTID:-}" ]] || return 0
+  command -v pct &>/dev/null || return 0
+  pct stop "$CTID" 2>/dev/null || true
+}
+```
+
+Called by all signal handlers to stop the container if:
+- Installation is in progress (`CONTAINER_INSTALLING=true`)
+- Container ID is set (`CTID` variable exists)
+- We're on the Proxmox host (`pct` command available)
+
+## Error Context Collection
+
+### Log Display
+
+When an error occurs, the last 20 lines of the active log are displayed:
+
+```bash error_handler.func:295-300
+if [[ -n "$active_log" && -s "$active_log" ]]; then
+  echo -e "\n${TAB}--- Last 20 lines of log ---"
+  tail -n 20 "$active_log"
+  echo -e "${TAB}-----------------------------------\n"
+fi
+```
+
+### Container Error Flags
+
+Inside the container, error information is written to flag files:
+
+```bash error_handler.func:305-309
+# Create error flag file with exit code for host detection
+echo "$exit_code" >"/root/.install-${SESSION_ID:-error}.failed" 2>/dev/null || true
+```
+
+The host can then retrieve this information via `pct exec` to determine the exact failure point.
+
+## Best Practices
+
+<Note>
+**Always call `catch_errors()` early**: Place it immediately after sourcing core.func and error_handler.func to ensure all errors are caught.
+
+**Use specific exit codes**: Return meaningful exit codes from functions to aid in debugging.
+
+**Never suppress errors silently**: Always use proper error handling, not `|| true` unless intentional.
+
+**Test signal handling**: Verify scripts handle Ctrl+C, SSH disconnects, and kills gracefully.
+
+**Include context in errors**: Use `msg_error` with descriptive messages, not just exit codes.
+</Note>
+
+## Error Recovery
+
+### Automatic Container Cleanup
+
+When an error occurs during container creation:
+
+1. **60-second timeout** starts
+2. **User prompt** appears: "Remove broken container {CTID}? (Y/n)"
+3. **Default action** (Y): Container stopped and destroyed
+4. **User can override** (n): Container kept for debugging
+5. **Auto-remove on timeout**: Container removed if no response
+
+### Manual Recovery
+
+If a container is left in a broken state:
+
+```bash
+# Stop the container
+pct stop CTID
+
+# Destroy the container
+pct destroy CTID
+
+# Check logs
+cat /tmp/create-lxc-*.log
+cat /tmp/{appname}-{CTID}-*.log
+```
+
+<Note>
+  The error handling system is designed to fail safely. Even if telemetry fails, log collection fails, or cleanup fails, the script will exit cleanly with the correct exit code.
+</Note>

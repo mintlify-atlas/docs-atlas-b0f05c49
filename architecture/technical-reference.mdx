@@ -1,0 +1,424 @@
+---
+title: Technical Reference
+description: Deep dive into the configuration system architecture, file formats, and security model
+---
+
+## System Architecture
+
+The Proxmox VE Helper Scripts use a modular architecture with multiple function libraries that work together to create and configure LXC containers and VMs.
+
+### Component Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Installation Script                       │
+│  (pihole-install.sh, docker-install.sh, etc.)              │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     v
+┌─────────────────────────────────────────────────────────────┐
+│                   build.func Library                         │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  variables()                                         │   │
+│  │  - Initialize NSAPP, var_install, etc.             │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  install_script()                                    │   │
+│  │  - Display mode menu                                │   │
+│  │  - Route to appropriate workflow                    │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  base_settings()                                     │   │
+│  │  - Apply built-in defaults                          │   │
+│  │  - Read environment variables (var_*)               │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  load_vars_file()                                    │   │
+│  │  - Safe file parsing (NO source/eval)              │   │
+│  │  - Whitelist validation                             │   │
+│  │  - Value sanitization                               │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                     │
+                     v
+┌─────────────────────────────────────────────────────────────┐
+│           Configuration Files (on Disk)                      │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  /usr/local/community-scripts/default.vars          │   │
+│  │  (User global defaults)                             │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  /usr/local/community-scripts/defaults/*.vars       │   │
+│  │  (App-specific defaults)                            │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Configuration File Format
+
+### User Defaults: `default.vars`
+
+**Location**: `/usr/local/community-scripts/default.vars`
+
+**Format Specification**:
+
+```bash
+# File Format: Simple key=value pairs
+# Purpose: Store global user defaults
+# Security: Sanitized values, whitelist validation
+
+# Comments and blank lines are ignored
+# Line format: var_name=value
+# No spaces around the equals sign
+# String values do not need quoting (but may be quoted)
+
+[CONTENT]
+var_cpu=4
+var_ram=2048
+var_disk=20
+var_hostname=mydefault
+var_brg=vmbr0
+var_gateway=192.168.1.1
+```
+
+<Accordion title="Formal Grammar">
+```
+FILE       := (BLANK_LINE | COMMENT_LINE | VAR_LINE)*
+BLANK_LINE := \n
+COMMENT_LINE := '#' [^\n]* \n
+VAR_LINE   := VAR_NAME '=' VAR_VALUE \n
+VAR_NAME   := 'var_' [a-z_]+
+VAR_VALUE  := [^\n]*  # Any printable characters except newline
+```
+</Accordion>
+
+**Constraints**:
+
+| Constraint        | Value                    |
+| ----------------- | ------------------------ |
+| Max file size     | 64 KB                    |
+| Max line length   | 1024 bytes               |
+| Max variables     | 100                      |
+| Allowed var names | `var_[a-z_]+`            |
+| Value validation  | Whitelist + Sanitization |
+
+### App Defaults: `<app>.vars`
+
+**Location**: `/usr/local/community-scripts/defaults/<appname>.vars`
+
+**Naming Convention**: `<nsapp>.vars`
+
+- `nsapp` = lowercase app name with spaces removed
+- Examples:
+  - `pihole` → `pihole.vars`
+  - `opnsense` → `opnsense.vars`
+  - `docker compose` → `dockercompose.vars`
+
+<Expandable title="Example App Defaults File">
+```bash
+# App-specific defaults for PiHole (pihole)
+# Generated on 2024-11-28T15:32:00Z
+# These override user defaults when installing pihole
+
+var_unprivileged=1
+var_cpu=2
+var_ram=1024
+var_disk=10
+var_brg=vmbr0
+var_net=veth
+var_gateway=192.168.1.1
+var_hostname=pihole
+var_timezone=Europe/Berlin
+var_container_storage=local
+var_template_storage=local
+var_tags=dns,pihole
+```
+</Expandable>
+
+## Variable Precedence
+
+### Loading Order
+
+When a container is being created, variables are resolved in this order:
+
+```
+Step 1: Read ENVIRONMENT VARIABLES
+   ├─ Check if var_cpu is already set in shell environment
+   ├─ Check if var_ram is already set
+   └─ ...all var_* variables
+
+Step 2: Load APP-SPECIFIC DEFAULTS
+   ├─ Check if /usr/local/community-scripts/defaults/pihole.vars exists
+   ├─ Load all var_* from that file
+   └─ These override built-ins but NOT environment variables
+
+Step 3: Load USER GLOBAL DEFAULTS
+   ├─ Check if /usr/local/community-scripts/default.vars exists
+   ├─ Load all var_* from that file
+   └─ These override built-ins but NOT app-specific
+
+Step 4: Use BUILT-IN DEFAULTS
+   └─ Hardcoded in script (lowest priority)
+```
+
+### Precedence Examples
+
+<CodeGroup>
+```bash Example 1: Environment Variable Wins
+# Shell environment has highest priority
+$ export var_cpu=16
+$ bash pihole-install.sh
+
+# Result: Container gets 16 cores
+# (ignores app defaults, user defaults, built-ins)
+```
+
+```bash Example 2: App Defaults Override User Defaults
+# User Defaults: var_cpu=4
+# App Defaults: var_cpu=2
+$ bash pihole-install.sh
+
+# Result: Container gets 2 cores
+# (app-specific setting takes precedence)
+```
+
+```bash Example 3: All Defaults Missing (Built-ins Used)
+# No environment variables set
+# No app defaults file
+# No user defaults file
+$ bash pihole-install.sh
+
+# Result: Uses built-in defaults
+# (var_cpu might be 2 by default)
+```
+</CodeGroup>
+
+## Security Model
+
+### Threat Model
+
+| Threat                       | Mitigation                                        |
+| ---------------------------- | ------------------------------------------------- |
+| **Arbitrary Code Execution** | No `source` or `eval`; manual parsing only        |
+| **Variable Injection**       | Whitelist of allowed variable names               |
+| **Command Substitution**     | `_sanitize_value()` blocks `$()`, backticks, etc. |
+| **Path Traversal**           | Files locked to `/usr/local/community-scripts/`   |
+| **Permission Escalation**    | Files created with restricted permissions         |
+| **Information Disclosure**   | Sensitive variables not logged                    |
+
+### Security Controls
+
+<Accordion title="1. Input Validation">
+```bash
+# Only specific variables allowed
+if ! _is_whitelisted_key "$key"; then
+  skip_this_variable
+fi
+
+# Values sanitized
+if ! val="$(_sanitize_value "$value")"; then
+  reject_entire_line
+fi
+```
+</Accordion>
+
+<Accordion title="2. Safe File Parsing">
+```bash
+# ❌ DANGEROUS (OLD)
+source /path/to/config.conf
+# Could execute: rm -rf / or any code
+
+# ✅ SAFE (NEW)
+load_vars_file "/path/to/config.conf"
+# Only reads var_name=value pairs, no execution
+```
+</Accordion>
+
+<Accordion title="3. Value Sanitization">
+```bash
+# Dangerous Patterns Blocked:
+# - $(...)  : Command substitution
+# - `...`   : Command substitution
+# - ;       : Command separator
+# - &       : Background execution
+# - <(...)  : Process substitution
+
+_sanitize_value() {
+  case "$1" in
+  *'$('* | *'`'* | *';'* | *'&'* | *'<('*)
+    echo ""
+    return 1  # Reject dangerous value
+    ;;
+  esac
+  echo "$1"
+  return 0
+}
+```
+</Accordion>
+
+<Accordion title="4. Whitelisting">
+```bash
+# Only these variables can be configured
+var_cpu, var_ram, var_disk, var_brg, ...
+var_hostname, var_pw, var_ssh, ...
+
+# NOT allowed:
+var_malicious, var_hack, custom_var, ...
+```
+</Accordion>
+
+## Data Flow Diagrams
+
+### Installation Flow: Advanced Settings
+
+```
+┌──────────────┐
+│  Start Script│
+└──────┬───────┘
+       │
+       v
+┌──────────────────────────────┐
+│ Display Installation Mode    │
+│ Menu (5 options)             │
+└──────┬───────────────────────┘
+       │ User selects "Advanced Settings"
+       v
+┌──────────────────────────────────┐
+│ Call: base_settings()            │
+│ (Apply built-in defaults)        │
+└──────┬───────────────────────────┘
+       │
+       v
+┌──────────────────────────────────┐
+│ Call: advanced_settings()        │
+│ (Show 19-step wizard)            │
+│ - Ask CPU, RAM, Disk, Network... │
+└──────┬───────────────────────────┘
+       │
+       v
+┌──────────────────────────────────┐
+│ Show Summary                     │
+│ Review all chosen values         │
+└──────┬───────────────────────────┘
+       │ User confirms
+       v
+┌──────────────────────────────────┐
+│ Create Container                 │
+│ Using current variable values    │
+└──────┬───────────────────────────┘
+       │
+       v
+┌──────────────────────────────────┐
+│ Installation Complete            │
+└──────┬───────────────────────────┘
+       │
+       v
+┌──────────────────────────────────────┐
+│ Offer: Save as App Defaults?         │
+│ (Save current settings)              │
+└──────┬───────────────────────────────┘
+       │
+       ├─ YES → Save to defaults/<app>.vars
+       │
+       └─ NO  → Exit
+```
+
+### Variable Resolution Flow
+
+```
+CONTAINER CREATION STARTED
+         │
+         v
+   ┌─────────────────────┐
+   │ Check ENVIRONMENT   │
+   │ for var_cpu, var_..│
+   └──────┬──────────────┘
+          │ Found? Use them (Priority 1)
+          │ Not found? Continue...
+          v
+   ┌──────────────────────────┐
+   │ Load App Defaults        │
+   │ /defaults/<app>.vars     │
+   └──────┬───────────────────┘
+          │ File exists? Parse & load (Priority 2)
+          │ Not found? Continue...
+          v
+   ┌──────────────────────────┐
+   │ Load User Defaults       │
+   │ /default.vars            │
+   └──────┬───────────────────┘
+          │ File exists? Parse & load (Priority 3)
+          │ Not found? Continue...
+          v
+   ┌──────────────────────────┐
+   │ Use Built-in Defaults    │
+   │ (Hardcoded values)       │
+   └──────┬───────────────────┘
+          │
+          v
+   ┌──────────────────────────┐
+   │ All Variables Resolved   │
+   │ Ready for container      │
+   │ creation                 │
+   └──────────────────────────┘
+```
+
+## Key Functions Reference
+
+### `load_vars_file(filepath)`
+
+**Purpose**: Safely load variables from .vars files without using `source` or `eval`
+
+**Returns**:
+- `0` on success
+- `1` on error (file missing, parse error, etc.)
+
+**Implementation Pattern**:
+
+```bash build.func:234-257
+load_vars_file() {
+  local file="$1"
+
+  # File must exist
+  [ -f "$file" ] || return 0
+
+  # Parse line by line (not with source/eval)
+  local line key val
+  while IFS='=' read -r key val || [ -n "$key" ]; do
+    # Skip comments and empty lines
+    [[ "$key" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "$key" ]] && continue
+
+    # Validate key is in whitelist
+    _is_whitelisted_key "$key" || continue
+
+    # Sanitize and export value
+    val="$(_sanitize_value "$val")"
+    [ $? -eq 0 ] && export "$key=$val"
+  done < "$file"
+
+  return 0
+}
+```
+
+### `_sanitize_value(value)`
+
+**Purpose**: Remove dangerous characters/patterns from configuration values
+
+**Returns**:
+- `0` (success) + sanitized value on stdout
+- `1` (failure) + nothing if dangerous
+
+**Dangerous Patterns**:
+
+| Pattern   | Threat               | Example              |
+| --------- | -------------------- | -------------------- |
+| `$(...)`  | Command substitution | `$(rm -rf /)`        |
+| `` ` ` `` | Command substitution | `` `whoami` ``       |
+| `;`       | Command separator    | `value; rm -rf /`    |
+| `&`       | Background execution | `value & malicious`  |
+| `<(`      | Process substitution | `<(cat /etc/passwd)` |
+
+<Note>
+  The configuration system uses a whitelist approach combined with value sanitization to prevent code injection attacks. Never use `source` or `eval` with user-provided configuration files.
+</Note>

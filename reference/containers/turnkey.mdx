@@ -1,0 +1,518 @@
+---
+title: Turnkey Linux Templates
+description: Pre-configured Turnkey Linux container templates for Proxmox VE
+---
+
+## Overview
+
+Turnkey Linux provides pre-configured container templates that are ready to use out of the box. These templates include optimized configurations, security hardening, and common applications pre-installed.
+
+## What are Turnkey Templates?
+
+Turnkey Linux appliances are pre-integrated, pre-configured solutions that work right out of the box:
+
+<CardGroup cols={3}>
+  <Card title="Ready to Use" icon="rocket">
+    Fully configured applications with sensible defaults
+  </Card>
+  <Card title="Security Hardened" icon="shield-halved">
+    Best practices applied, regular security updates
+  </Card>
+  <Card title="Web Management" icon="browser">
+    Webmin and Webshell included for easy management
+  </Card>
+</CardGroup>
+
+## Available Templates
+
+Turnkey Linux offers 100+ appliances. Popular templates include:
+
+### Web Applications
+
+<AccordionGroup>
+  <Accordion title="Content Management (CMS)">
+    - **WordPress** - Popular blogging platform and CMS
+    - **Drupal** - Powerful enterprise CMS
+    - **Joomla** - Flexible content management system
+    - **Ghost** - Modern publishing platform
+    - **MediaWiki** - Wiki software powering Wikipedia
+    - **DokuWiki** - Simple wiki without database
+    - **Concrete5** - User-friendly CMS
+  </Accordion>
+
+  <Accordion title="E-Commerce">
+    - **Magento** - Professional e-commerce platform
+    - **PrestaShop** - Open source e-commerce solution
+    - **OpenCart** - Free shopping cart system
+    - **WooCommerce** - WordPress e-commerce plugin
+  </Accordion>
+
+  <Accordion title="Forums & Communities">
+    - **phpBB** - Flat-forum bulletin board software
+    - **Simple Machines Forum** - Free forum software
+    - **Vanilla Forums** - Modern community platform
+    - **Discourse** - Modern forum and community platform
+  </Accordion>
+</AccordionGroup>
+
+### Development
+
+<AccordionGroup>
+  <Accordion title="Development Platforms">
+    - **GitLab** - Complete DevOps platform
+    - **Redmine** - Flexible project management
+    - **Trac** - Enhanced wiki and issue tracking
+    - **Jenkins** - Continuous integration server
+    - **Observium** - Network monitoring platform
+  </Accordion>
+
+  <Accordion title="Collaboration Tools">
+    - **Mattermost** - Open source Slack alternative
+    - **Rocket.Chat** - Team communication platform
+    - **Nextcloud** - File sync and collaboration
+    - **ownCloud** - File sharing and collaboration
+  </Accordion>
+</AccordionGroup>
+
+### Databases
+
+<Accordion title="Database Servers">
+  - **PostgreSQL** - Advanced relational database
+  - **MySQL** - Popular database server
+  - **MongoDB** - NoSQL document database
+  - **Redis** - In-memory data structure store
+</Accordion>
+
+### Networking & Infrastructure
+
+<AccordionGroup>
+  <Accordion title="Web Servers">
+    - **LAMP Stack** - Linux, Apache, MySQL, PHP
+    - **LAPP Stack** - Linux, Apache, PostgreSQL, PHP
+    - **Nginx** - High-performance web server
+    - **Tomcat** - Java servlet container
+  </Accordion>
+
+  <Accordion title="File Services">
+    - **File Server** - Samba file sharing
+    - **Fileserver** - Comprehensive file server
+    - **Syncthing** - Continuous file synchronization
+    - **Rsync Server** - Remote file synchronization
+  </Accordion>
+
+  <Accordion title="Network Services">
+    - **OpenVPN** - Virtual private network
+    - **Domain Controller** - Samba Active Directory
+    - **DHCP Server** - Dynamic host configuration
+    - **DNS Server** - BIND domain name service
+  </Accordion>
+</AccordionGroup>
+
+### Business Applications
+
+<AccordionGroup>
+  <Accordion title="CRM & ERP">
+    - **Odoo** - Business management suite
+    - **SuiteCRM** - Open source CRM
+    - **CiviCRM** - Constituent relationship management
+    - **Vtiger CRM** - Customer relationship platform
+  </Accordion>
+
+  <Accordion title="Project Management">
+    - **Redmine** - Project management web application
+    - **ProjectPier** - Project management and collaboration
+    - **Tracks** - GTD web application
+  </Accordion>
+
+  <Accordion title="Finance & Accounting">
+    - **Invoice Ninja** - Invoicing and time tracking
+    - **Simple Invoices** - Invoice management
+    - **Odoo Accounting** - Complete accounting suite
+  </Accordion>
+</AccordionGroup>
+
+### Media & Entertainment
+
+<Accordion title="Media Servers">
+  - **Plex** - Media server platform
+  - **Subsonic** - Media streaming server
+  - **Ampache** - Web-based audio streaming
+  - **MediaWiki** - Collaborative documentation
+</Accordion>
+
+### Communication
+
+<Accordion title="Mail & Messaging">
+  - **Mail Server** - Postfix mail server
+  - **Zimbra** - Email and collaboration
+  - **Roundcube** - Webmail interface
+  - **Mattermost** - Team messaging
+</Accordion>
+
+### Analytics & Monitoring
+
+<Accordion title="Monitoring Tools">
+  - **Observium** - Network monitoring
+  - **Nagios** - Infrastructure monitoring
+  - **Icinga** - Monitoring and alerting
+  - **LibreNMS** - Network monitoring system
+  - **Munin** - Resource monitoring
+</Accordion>
+
+## Installation Methods
+
+<Tabs>
+  <Tab title="Via Proxmox Web UI">
+    1. Navigate to your storage in Proxmox web interface
+    2. Click **CT Templates**
+    3. Click **Templates** button
+    4. Select desired Turnkey template from list
+    5. Click **Download**
+    6. Create container using downloaded template
+
+    **Note**: This downloads official Turnkey LXC templates from Proxmox template repository.
+  </Tab>
+
+  <Tab title="Via Command Line">
+    Download template directly:
+    ```bash
+    pveam update
+    pveam available --section turnkeylinux
+    pveam download local debian-XX-turnkey-appname_VERSION_amd64.tar.gz
+    ```
+
+    Create container:
+    ```bash
+    pct create 100 local:vztmpl/debian-XX-turnkey-appname_VERSION_amd64.tar.gz \
+      --hostname turnkey-app \
+      --memory 2048 \
+      --net0 name=eth0,bridge=vmbr0,ip=dhcp \
+      --storage local-lvm
+    ```
+  </Tab>
+
+  <Tab title="Via Helper Scripts">
+    Some helper scripts may be available for automating Turnkey deployments:
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/tteck/Proxmox/raw/main/ct/turnkey-app.sh)"
+    ```
+
+    **Note**: Not all Turnkey appliances have dedicated helper scripts. Use Proxmox native template system for most deployments.
+  </Tab>
+</Tabs>
+
+## First-Time Configuration
+
+All Turnkey appliances include a first-boot initialization:
+
+<Steps>
+  <Step title="Initial Boot">
+    Start the container and access console or SSH
+  </Step>
+  
+  <Step title="Set Passwords">
+    You'll be prompted to set:
+    - Root password
+    - MySQL/PostgreSQL password (if applicable)
+    - Application admin password
+  </Step>
+  
+  <Step title="Configure Email">
+    Optional: Configure email relay for notifications
+  </Step>
+  
+  <Step title="Security Updates">
+    Choose automatic security updates preference
+  </Step>
+  
+  <Step title="Access Web Interface">
+    Navigate to container IP to complete application setup
+  </Step>
+</Steps>
+
+## Built-in Features
+
+Every Turnkey appliance includes:
+
+<CardGroup cols={2}>
+  <Card title="Webmin" icon="gear">
+    Web-based system administration interface at port 12321
+  </Card>
+  <Card title="Webshell" icon="terminal">
+    Web-based shell access at port 12320
+  </Card>
+  <Card title="Auto-Updates" icon="arrows-rotate">
+    Automated security updates (configurable)
+  </Card>
+  <Card title="Configuration Console" icon="sliders">
+    Text-based configuration utility (confconsole)
+  </Card>
+</CardGroup>
+
+### Accessing Management Tools
+
+```bash
+# Webmin
+https://YOUR-IP:12321
+
+# Webshell  
+https://YOUR-IP:12320
+
+# Configuration Console (in container)
+confconsole
+```
+
+## Security Features
+
+<AccordionGroup>
+  <Accordion title="Automatic Security Updates">
+    Turnkey appliances can automatically install security updates:
+    - Configured during first boot
+    - Updates applied daily by default
+    - Reboot scheduled if required
+    - Can be disabled or customized via Webmin
+  </Accordion>
+
+  <Accordion title="Firewall Configuration">
+    Basic firewall rules pre-configured:
+    - Only necessary ports open
+    - SSH access enabled by default
+    - Customizable via confconsole or Webmin
+  </Accordion>
+
+  <Accordion title="SSL/TLS Certificates">
+    Many appliances include:
+    - Self-signed certificates by default
+    - Let's Encrypt integration available
+    - Easy certificate management via Webmin
+  </Accordion>
+
+  <Accordion title="Backup Integration">
+    Built-in backup tools:
+    - TKLBAM (Turnkey Linux Backup and Migration)
+    - Encrypted incremental backups
+    - Cloud storage support
+    - Disaster recovery ready
+  </Accordion>
+</AccordionGroup>
+
+## Advantages of Turnkey Templates
+
+<CardGroup cols={2}>
+  <Card title="Time Saving" icon="clock">
+    Pre-configured and ready to use in minutes
+  </Card>
+  <Card title="Best Practices" icon="star">
+    Security and performance optimizations applied
+  </Card>
+  <Card title="Regular Updates" icon="download">
+    Official templates updated regularly
+  </Card>
+  <Card title="Documentation" icon="book">
+    Extensive docs at turnkeylinux.org
+  </Card>
+  <Card title="Community Support" icon="users">
+    Active community forums and support
+  </Card>
+  <Card title="Consistency" icon="check-double">
+    Standardized configuration across deployments
+  </Card>
+</CardGroup>
+
+## Comparison: Turnkey vs Helper Scripts
+
+<Tabs>
+  <Tab title="Turnkey Templates">
+    **Pros:**
+    - Official, well-tested configurations
+    - Comprehensive management tools included
+    - Backed by Turnkey Linux organization
+    - Regular security updates
+    - Extensive documentation
+
+    **Cons:**
+    - May include extra packages you don't need
+    - Slightly larger footprint
+    - Update cycle may lag latest app versions
+    - Limited customization during install
+  </Tab>
+
+  <Tab title="Helper Scripts">
+    **Pros:**
+    - Minimal installation
+    - Latest application versions
+    - Highly customizable
+    - Optimized for specific use cases
+    - Interactive configuration
+
+    **Cons:**
+    - Less standardized
+    - May require more manual configuration
+    - Community-maintained (varying support levels)
+    - Need to manage updates yourself
+  </Tab>
+</Tabs>
+
+## Resource Requirements
+
+Typical Turnkey template requirements:
+
+| Category | RAM | Storage | CPU |
+|----------|-----|---------|-----|
+| Small apps (Wiki, Blog) | 512MB - 1GB | 4-8GB | 1 core |
+| Medium apps (CRM, CMS) | 1-2GB | 8-16GB | 2 cores |
+| Large apps (GitLab, Odoo) | 4-8GB | 20-40GB | 4 cores |
+| Database servers | 2-4GB | 10-20GB | 2 cores |
+| Mail servers | 1-2GB | 10-20GB | 1-2 cores |
+
+## Backup & Migration
+
+Turnkey's TKLBAM tool provides:
+
+```bash
+# Initialize backup profile
+tklbam-init
+
+# Create backup
+tklbam-backup
+
+# Restore backup
+tklbam-restore
+
+# List backups
+tklbam-list
+```
+
+<Accordion title="Backup Best Practices">
+  - Enable automatic daily backups
+  - Store backups offsite (cloud or remote server)
+  - Test restore procedures regularly
+  - Document custom configurations
+  - Exclude temporary files and caches
+</Accordion>
+
+## Common Tasks
+
+<AccordionGroup>
+  <Accordion title="Change Passwords">
+    ```bash
+    # Root password
+    passwd
+
+    # MySQL root password
+    mysqladmin -u root -p password newpassword
+
+    # PostgreSQL password
+    sudo -u postgres psql
+    \password postgres
+    ```
+  </Accordion>
+
+  <Accordion title="Update System">
+    ```bash
+    # Update package lists
+    apt update
+
+    # Upgrade all packages
+    apt upgrade
+
+    # Full distribution upgrade
+    apt dist-upgrade
+    ```
+  </Accordion>
+
+  <Accordion title="Configure SSL">
+    Via Webmin:
+    1. Navigate to Webmin → Webmin Configuration → SSL Encryption
+    2. Upload certificate or use Let's Encrypt
+    3. Apply and restart services
+
+    Via Command Line:
+    ```bash
+    # Install Let's Encrypt
+    apt install certbot
+
+    # Obtain certificate
+    certbot certonly --standalone -d your-domain.com
+    ```
+  </Accordion>
+
+  <Accordion title="Access Logs">
+    ```bash
+    # System logs
+    journalctl -f
+
+    # Apache logs
+    tail -f /var/log/apache2/error.log
+
+    # Application logs (varies by app)
+    tail -f /var/log/appname/error.log
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Can't Access Web Interface">
+    1. Verify container is running: `pct status VMID`
+    2. Check IP address: `pct exec VMID -- ip addr`
+    3. Verify firewall allows connection
+    4. Check service status: `pct exec VMID -- systemctl status apache2`
+    5. Review logs for errors
+  </Accordion>
+
+  <Accordion title="First Boot Configuration Didn't Run">
+    Manually trigger initialization:
+    ```bash
+    pct enter VMID
+    /usr/lib/inithooks/firstboot.d/run
+    ```
+  </Accordion>
+
+  <Accordion title="Forgot Admin Password">
+    Reset via console:
+    ```bash
+    # Enter container
+    pct enter VMID
+
+    # Reset root password
+    passwd
+
+    # Reset application password (varies by app)
+    # WordPress example:
+    mysql wordpress -e "UPDATE wp_users SET user_pass=MD5('newpass') WHERE ID=1;"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## External Resources
+
+<CardGroup cols={2}>
+  <Card title="Turnkey Linux" icon="external-link" href="https://www.turnkeylinux.org">
+    Official Turnkey Linux website
+  </Card>
+  <Card title="Appliance Library" icon="book-open" href="https://www.turnkeylinux.org/all">
+    Browse all available appliances
+  </Card>
+  <Card title="Documentation" icon="file-lines" href="https://www.turnkeylinux.org/docs">
+    Comprehensive guides and docs
+  </Card>
+  <Card title="Community Forums" icon="comments" href="https://www.turnkeylinux.org/forum">
+    Get help and share knowledge
+  </Card>
+</CardGroup>
+
+## See Also
+
+<CardGroup cols={3}>
+  <Card title="Debian Scripts" icon="debian" href="/reference/containers/debian-based">
+    Custom Debian-based containers
+  </Card>
+  <Card title="Alpine Scripts" icon="mountain" href="/reference/containers/alpine-based">
+    Lightweight Alpine containers
+  </Card>
+  <Card title="Container Overview" icon="layer-group" href="/reference/containers/overview">
+    All container options
+  </Card>
+</CardGroup>

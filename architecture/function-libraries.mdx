@@ -1,0 +1,423 @@
+---
+title: Function Libraries
+description: Complete reference for all 9 function libraries and their purposes
+---
+
+The Proxmox VE Helper Scripts architecture uses 9 specialized function libraries that work together to create and manage LXC containers and VMs. Each library has a specific purpose and integration point.
+
+## Core Libraries
+
+### build.func
+
+**LXC Container Build & Configuration**
+
+The main orchestrator for Proxmox LXC container creation. This is the heart of the container creation workflow.
+
+<Accordion title="Key Responsibilities">
+- Variable initialization and defaults management
+- Container creation and resource allocation
+- Storage selection and validation
+- Advanced configuration wizard (19 steps)
+- User defaults and app-specific defaults loading
+- Installation mode routing (Default, Advanced, Edit)
+</Accordion>
+
+<Accordion title="Key Functions (50+)">
+- `variables()` - Initialize core variables (NSAPP, SESSION_ID, EXECUTION_ID)
+- `install_script()` - Main entry point and mode selection
+- `build_container()` - Create and configure the LXC container
+- `advanced_settings()` - Interactive configuration wizard
+- `base_settings()` - Apply built-in and user defaults
+- `load_vars_file()` - Safe configuration file parsing
+- `default_var_settings()` - Load user global defaults
+- `maybe_offer_save_app_defaults()` - Save settings for future use
+- `storage_selector()` - Interactive storage selection
+- `validate_container_id()` - Cluster-wide CTID validation
+</Accordion>
+
+<Accordion title="Integration Points">
+- Sources: `api.func`, `core.func`, `error_handler.func`
+- Called by: CT creation scripts (`ct/<app>.sh`)
+- Calls into: Container install scripts via `pct exec`
+</Accordion>
+
+**Location**: `misc/build.func`
+
+---
+
+### core.func
+
+**System Utilities & Foundation**
+
+Provides essential utility functions used across all scripts including colors, messaging, validation checks, and execution helpers.
+
+<Accordion title="Key Responsibilities">
+- Terminal color codes and formatting
+- Standardized message output (msg_info, msg_ok, msg_error)
+- System validation (root check, PVE check, architecture check)
+- Silent/verbose execution modes
+- Spinner animations for long-running operations
+- Development mode parsing
+</Accordion>
+
+<Accordion title="Key Functions (20+)">
+- `load_functions()` - Initialize all utility groups
+- `color()` - Set ANSI color codes
+- `msg_info()` - Display info message with spinner
+- `msg_ok()` - Display success message
+- `msg_error()` - Display error message
+- `msg_warn()` - Display warning message
+- `root_check()` - Verify root privileges
+- `pve_check()` - Verify Proxmox VE environment
+- `arch_check()` - Verify supported architecture
+- `parse_dev_mode()` - Parse development mode flags
+- `silent()` - Execute command with output suppression
+- `spinner()` - Animated loading indicator
+</Accordion>
+
+<Accordion title="Integration Points">
+- Sourced by: ALL scripts (first library loaded)
+- No dependencies (foundation library)
+- Provides: Global variables and functions used everywhere
+</Accordion>
+
+**Location**: `misc/core.func`
+
+---
+
+### error_handler.func
+
+**Error Handling & Signal Management**
+
+Comprehensive error handling and signal trapping to ensure proper cleanup and telemetry reporting.
+
+<Accordion title="Key Responsibilities">
+- Exit code explanations (150+ codes mapped)
+- Error handler with detailed logging
+- Signal handlers (EXIT, INT, TERM, HUP)
+- Orphaned container cleanup
+- Telemetry failure reporting
+- Log collection and display
+</Accordion>
+
+<Accordion title="Key Functions (10+)">
+- `catch_errors()` - Initialize error handling and traps
+- `error_handler()` - Main error handler (ERR trap)
+- `explain_exit_code()` - Map exit code to description
+- `on_exit()` - EXIT trap (cleanup and orphan detection)
+- `on_interrupt()` - SIGINT handler (Ctrl+C)
+- `on_terminate()` - SIGTERM handler (kill)
+- `on_hangup()` - SIGHUP handler (SSH disconnect)
+- `_send_abort_telemetry()` - Report failure to API
+- `_stop_container_if_installing()` - Stop orphaned containers
+</Accordion>
+
+<Accordion title="Supported Exit Codes">
+- **1-10**: Generic shell errors
+- **4-95**: curl/wget errors
+- **100-102**: APT/DPKG errors
+- **103-123**: Script validation & setup
+- **124-146**: Signals and timeouts
+- **150-154**: Systemd/service errors
+- **160-162**: Python/pip errors
+- **170-193**: Database errors (PostgreSQL, MySQL, MongoDB)
+- **200-231**: Proxmox custom codes
+- **232-238**: Tools & addon scripts
+- **239-249**: Node.js/npm errors
+- **250-254**: Application install/update errors
+</Accordion>
+
+**Location**: `misc/error_handler.func`
+
+---
+
+### api.func
+
+**Telemetry & Diagnostics API**
+
+Handles anonymous telemetry reporting to help improve script reliability and track installation success rates.
+
+<Accordion title="Key Responsibilities">
+- Container/VM creation statistics
+- Installation success/failure tracking
+- Error code categorization and reporting
+- Repository source detection
+- Privacy-respecting anonymous telemetry
+</Accordion>
+
+<Accordion title="Key Functions (5+)">
+- `post_to_api()` - Report LXC container creation start
+- `post_to_api_vm()` - Report VM creation start
+- `post_update_to_api()` - Update installation status
+- `detect_repo_source()` - Identify script source (ProxmoxVE/ProxmoxVED/external)
+- `categorize_error()` - Map exit code to error category
+- `get_error_description()` - Build error context string
+</Accordion>
+
+<Accordion title="Privacy Features">
+- Only anonymous statistics (no personal data)
+- User can opt-out via DIAGNOSTICS=no
+- Random UUID for session tracking only
+- Data retention: 30 days
+- No IP addresses or hostnames collected
+</Accordion>
+
+**Telemetry URL**: `https://telemetry.community-scripts.org/telemetry`
+
+**Location**: `misc/api.func`
+
+---
+
+## Installation & Setup Libraries
+
+### install.func
+
+**Container Installation Workflow**
+
+Executes inside LXC containers after creation to perform initial setup and configuration.
+
+<Accordion title="Key Responsibilities">
+- Network connectivity verification (IPv4/IPv6)
+- OS updates and package installation
+- DNS resolution checks
+- MOTD and SSH configuration
+- Container customization and auto-login
+</Accordion>
+
+<Accordion title="Key Functions (8+)">
+- `setting_up_container()` - Verify network connectivity
+- `network_check()` - Comprehensive IPv4/IPv6 internet check
+- `update_os()` - Update container OS packages
+- `motd_ssh()` - Configure MOTD and SSH access
+- `customize()` - Apply container customizations
+- `cleanup_lxc()` - Remove unnecessary packages
+- `verb_ip6()` - Configure IPv6 settings
+- `post_progress_to_api()` - Report installation progress
+</Accordion>
+
+<Accordion title="Network Checks">
+**IPv4 DNS Servers Tested**:
+- 1.1.1.1 (Cloudflare)
+- 8.8.8.8 (Google)
+- 9.9.9.9 (Quad9)
+
+**IPv6 DNS Servers Tested**:
+- 2606:4700:4700::1111 (Cloudflare)
+- 2001:4860:4860::8888 (Google)
+- 2620:fe::fe (Quad9)
+
+**DNS Resolution Verified**:
+- github.com
+- raw.githubusercontent.com
+- api.github.com
+- git.community-scripts.org
+</Accordion>
+
+**Location**: `misc/install.func`
+
+---
+
+### tools.func
+
+**Package & Tool Installation**
+
+Robust package management and tool installation functions with automatic retry logic and OS-upgrade safety.
+
+<Accordion title="Key Responsibilities">
+- Automatic retry logic for transient APT failures
+- Unified keyring cleanup (3 locations)
+- Legacy installation cleanup (nvm, rbenv, rustup)
+- OS-upgrade-safe repository preparation
+- 30+ tool-specific installation functions
+</Accordion>
+
+<Accordion title="Key Functions (30+)">
+**Package Management**:
+- `install_packages_with_retry()` - Install with 3 retries
+- `upgrade_packages_with_retry()` - Upgrade with retry logic
+- `pkg_install()` - Wrapper for package installation
+- `pkg_update()` - Update package lists
+
+**Repository Management**:
+- `setup_deb822_repo()` - Modern DEB822 format repositories
+- `prepare_repository_setup()` - Cleanup repos before setup
+- `cleanup_tool_keyrings()` - Remove old keyrings
+- `download_gpg_key()` - Download and validate GPG keys
+
+**Tool Installation** (examples):
+- `setup_nodejs()` - Node.js with specific version
+- `setup_php()` - PHP with extensions
+- `setup_mariadb()` - MariaDB server
+- `setup_docker()` - Docker Engine
+- `setup_python_uv()` - Python with uv package manager
+- `setup_postgresql()` - PostgreSQL server
+- `setup_nginx()` - Nginx web server
+- `setup_go()` - Go programming language
+- `setup_rust()` - Rust programming language
+</Accordion>
+
+<Accordion title="Retry Logic">
+```bash
+# Install with automatic retry on failure
+install_packages_with_retry "package1" "package2" "package3"
+
+# Custom retry count
+RETRY_COUNT=5 install_packages_with_retry "package"
+
+# Debug mode
+TOOLS_DEBUG=true install_packages_with_retry "package"
+```
+</Accordion>
+
+**Location**: `misc/tools.func`
+
+---
+
+## Alpine Linux Libraries
+
+### alpine-install.func
+
+**Alpine Container Setup**
+
+Alpine Linux-specific installation functions for lightweight container deployments.
+
+<Accordion title="Key Responsibilities">
+- Alpine OS updates (apk-based)
+- IPv6 configuration for Alpine
+- MOTD and SSH for Alpine
+- Alpine-specific customizations
+</Accordion>
+
+<Accordion title="Key Functions (6+)">
+- `update_os()` - Alpine version using apk
+- `verb_ip6()` - IPv6 configuration for Alpine
+- `motd_ssh()` - Alpine MOTD/SSH setup
+- `customize()` - Alpine customizations
+- `cleanup_lxc()` - Alpine cleanup
+</Accordion>
+
+**Location**: `misc/alpine-install.func`
+
+---
+
+### alpine-tools.func
+
+**Alpine Tool Installation**
+
+Alpine-specific package and tool installation functions.
+
+<Accordion title="Key Responsibilities">
+- Alpine package management (apk)
+- Community repository enablement
+- Alpine-specific tool installations
+</Accordion>
+
+<Accordion title="Key Functions (15+)">
+- `apk_add()` - Install Alpine packages
+- `apk_update()` - Update Alpine package lists
+- `apk_del()` - Remove Alpine packages
+- `add_community_repo()` - Enable Alpine community repo
+- Alpine-specific tool setup functions
+</Accordion>
+
+**Location**: `misc/alpine-tools.func`
+
+---
+
+## VM Provisioning Libraries
+
+### cloud-init.func
+
+**VM Cloud-Init Configuration**
+
+Cloud-init and VM provisioning functions for automated VM deployment.
+
+<Accordion title="Key Responsibilities">
+- Cloud-init configuration generation
+- User-data and meta-data creation
+- SSH key installation for VMs
+- Static IP configuration
+- VM network configuration
+</Accordion>
+
+<Accordion title="Key Functions (12+)">
+- `generate_cloud_init()` - Generate cloud-init config
+- `generate_user_data()` - Create user-data file
+- `setup_ssh_keys()` - Configure SSH keys for VM
+- `setup_static_ip()` - Static IP configuration
+- `configure_network()` - VM network setup
+</Accordion>
+
+**Location**: `misc/cloud-init.func`
+
+---
+
+## Function Library Relationships
+
+```
+┌─────────────────────────────────────────────┐
+│       Container Creation Flow               │
+├─────────────────────────────────────────────┤
+│                                             │
+│  ct/AppName.sh                              │
+│      ↓ (sources)                            │
+│  build.func                                 │
+│      ├─ variables()                         │
+│      ├─ build_container()                   │
+│      └─ advanced_settings()                 │
+│      ↓ (calls pct create with)              │
+│  install/appname-install.sh                 │
+│      ↓ (sources)                            │
+│      ├─ core.func      (colors, messaging)  │
+│      ├─ error_handler.func (error trapping) │
+│      ├─ install.func   (setup/network)      │
+│      └─ tools.func     (packages/tools)     │
+│                                             │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│       Alpine Container Flow                 │
+├─────────────────────────────────────────────┤
+│                                             │
+│  install/appname-install.sh (Alpine)        │
+│      ↓ (sources)                            │
+│      ├─ core.func              (colors)     │
+│      ├─ error_handler.func     (errors)     │
+│      ├─ alpine-install.func    (apk setup)  │
+│      └─ alpine-tools.func      (apk tools)  │
+│                                             │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│       VM Provisioning Flow                  │
+├─────────────────────────────────────────────┤
+│                                             │
+│  vm/OsName-vm.sh                            │
+│      ↓ (uses)                               │
+│  cloud-init.func                            │
+│      ├─ generate_cloud_init()               │
+│      ├─ setup_ssh_keys()                    │
+│      └─ configure_network()                 │
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+## Quick Stats
+
+| Library | Functions | Primary Use Case | Dependencies |
+|---------|:---------:|------------------|-------------|
+| build.func | 50+ | LXC container creation | api.func, core.func, error_handler.func |
+| core.func | 20+ | System utilities | None (foundation) |
+| error_handler.func | 10+ | Error handling | core.func |
+| api.func | 5+ | Telemetry reporting | None |
+| install.func | 8+ | Container setup | core.func, error_handler.func |
+| tools.func | 30+ | Package management | core.func |
+| alpine-install.func | 6+ | Alpine setup | core.func, error_handler.func |
+| alpine-tools.func | 15+ | Alpine packages | core.func |
+| cloud-init.func | 12+ | VM provisioning | core.func |
+
+**Total**: 9 function libraries, 150+ functions
+
+<Note>
+  All function libraries are loaded via HTTP/HTTPS from the main repository using `source <(curl -fsSL ...)` to ensure users always get the latest version without manual updates.
+</Note>

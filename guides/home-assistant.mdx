@@ -1,0 +1,481 @@
+---
+title: Home Assistant Installation Guide
+description: Complete guide to installing and configuring Home Assistant OS on Proxmox VE
+---
+
+Home Assistant is an open-source home automation platform. This guide covers installing Home Assistant OS as a VM on Proxmox VE.
+
+## Installation Methods
+
+Home Assistant OS runs as a **virtual machine** (not an LXC container) to provide full access to hardware and ensure compatibility.
+
+<CardGroup cols={2}>
+  <Card title="Home Assistant OS" icon="home" color="#03a9f4">
+    **Recommended Method**
+    - Full VM installation
+    - Complete Home Assistant features
+    - Add-on support
+    - Best compatibility
+  </Card>
+  
+  <Card title="Alternative Methods" icon="cube">
+    **Container Options**
+    - Home Assistant Container
+    - Home Assistant Core
+    - Limited add-on support
+  </Card>
+</CardGroup>
+
+## Quick Installation
+
+<Steps>
+  <Step title="Run the Installation Script">
+    Execute the script from your Proxmox shell:
+    ```bash
+    bash -c "$(wget -qO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/haos-vm.sh)"
+    ```
+  </Step>
+  
+  <Step title="Choose Installation Type">
+    You'll be prompted to choose between:
+    - **Default Settings** - Quick setup with recommended values
+    - **Advanced Settings** - Customize all parameters
+  </Step>
+  
+  <Step title="Wait for Installation">
+    The script will:
+    - Download the latest Home Assistant OS image
+    - Create and configure the VM
+    - Import the disk image
+    - Configure EFI boot
+    - Start the VM (if selected)
+  </Step>
+  
+  <Step title="Access Home Assistant">
+    After the VM boots (2-5 minutes), access Home Assistant at:
+    ```
+    http://<vm-ip>:8123
+    ```
+  </Step>
+</Steps>
+
+## Default Configuration
+
+The script uses these default settings:
+
+| Setting | Default Value |
+|---------|---------------|
+| **VM ID** | Next available ID |
+| **Machine Type** | q35 (Modern PCIe) |
+| **Disk Size** | 32 GB |
+| **Hostname** | haos-{version} |
+| **CPU Model** | KVM64 |
+| **CPU Cores** | 2 |
+| **RAM** | 4096 MB (4 GB) |
+| **Network Bridge** | vmbr0 |
+| **Start VM** | Yes |
+
+<Note>
+Home Assistant OS uses **UEFI boot** with EFI disk and **virtio-scsi-pci** storage controller for optimal performance.
+</Note>
+
+## Advanced Configuration
+
+When using advanced settings, you can customize:
+
+### Version Selection
+
+<Tabs>
+  <Tab title="Stable (Recommended)">
+    The stable version is thoroughly tested and recommended for production use.
+    ```bash
+    # Selected by default
+    BRANCH="stable"
+    ```
+  </Tab>
+  
+  <Tab title="Beta">
+    Beta versions include upcoming features before stable release.
+    ```bash
+    BRANCH="beta"
+    ```
+  </Tab>
+  
+  <Tab title="Dev">
+    Development versions for testing cutting-edge features.
+    <Warning>
+    Dev versions may contain bugs. Not recommended for production.
+    </Warning>
+  </Tab>
+</Tabs>
+
+### Machine Type
+
+<CardGroup cols={2}>
+  <Card title="Q35 (Recommended)" icon="microchip">
+    Modern machine type with:
+    - PCIe support
+    - UEFI firmware
+    - Better device passthrough
+    - Default option
+  </Card>
+  
+  <Card title="i440fx" icon="memory">
+    Legacy machine type:
+    - Older compatibility
+    - PCI (not PCIe)
+    - Use if migration needed
+  </Card>
+</CardGroup>
+
+### CPU Configuration
+
+**Host CPU (Recommended):**
+```bash
+CPU_TYPE="host"
+```
+- Uses host CPU features
+- Better performance
+- Cannot migrate to different CPU types
+
+**KVM64 (Compatibility):**
+```bash
+CPU_TYPE="kvm64"
+```
+- Generic CPU model
+- Safe for migration
+- Slightly lower performance
+
+### Storage Requirements
+
+<Tip>
+**Minimum:** 32 GB (default)
+**Recommended:** 64 GB or more for:
+- Multiple integrations
+- Recording history
+- Backups
+- Database growth
+</Tip>
+
+Resize disk during installation:
+```bash
+DISK_SIZE="64G"
+```
+
+Or resize after installation:
+```bash
+qm resize <VMID> scsi0 +32G
+```
+
+## Network Configuration
+
+### Static IP Address
+
+After first boot, configure a static IP:
+
+<Steps>
+  <Step title="Access Home Assistant">
+    Navigate to `http://<vm-ip>:8123`
+  </Step>
+  
+  <Step title="Open Network Settings">
+    1. Complete the initial setup
+    2. Go to **Settings** → **System** → **Network**
+  </Step>
+  
+  <Step title="Configure IPv4">
+    Set static IP address, gateway, and DNS servers
+  </Step>
+</Steps>
+
+### VLAN Configuration
+
+If you need to assign a VLAN tag:
+
+```bash
+# During advanced installation
+VLAN="10"  # Your VLAN ID
+```
+
+Or modify after creation:
+```bash
+qm set <VMID> -net0 virtio,bridge=vmbr0,tag=10
+```
+
+## Hardware Passthrough
+
+### USB Device Passthrough
+
+For Zigbee, Z-Wave, or other USB devices:
+
+<Steps>
+  <Step title="Identify USB Device">
+    ```bash
+    lsusb
+    ```
+    Note the vendor:product ID (e.g., `10c4:ea60`)
+  </Step>
+  
+  <Step title="Add USB Device to VM">
+    ```bash
+    qm set <VMID> -usb0 host=10c4:ea60
+    ```
+  </Step>
+  
+  <Step title="Restart VM">
+    ```bash
+    qm stop <VMID>
+    qm start <VMID>
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+USB passthrough requires the VM to be stopped before adding devices.
+</Warning>
+
+### GPIO / Serial Devices
+
+For devices requiring serial access:
+
+```bash
+# Add serial device
+qm set <VMID> -serial0 /dev/ttyUSB0
+```
+
+## Performance Optimization
+
+### Enable Ballooning Device
+
+Allow dynamic memory allocation:
+
+```bash
+qm set <VMID> -balloon 2048
+```
+
+### Disk Cache Mode
+
+For better I/O performance:
+
+```bash
+qm set <VMID> -scsi0 local-lvm:vm-<VMID>-disk-0,cache=writethrough,discard=on,ssd=1
+```
+
+### CPU Performance
+
+Pin CPU cores for better performance:
+
+```bash
+qm set <VMID> -cores 2 -cpu host,flags=+pcid
+```
+
+## Backup and Restore
+
+### Creating Backups
+
+<Tabs>
+  <Tab title="CLI Method">
+    ```bash
+    # Create backup with compression
+    vzdump <VMID> --mode snapshot --compress zstd --storage local
+    ```
+  </Tab>
+  
+  <Tab title="Web UI Method">
+    1. Select the VM in Proxmox UI
+    2. Click **Backup** → **Backup now**
+    3. Choose compression and storage
+  </Tab>
+</Tabs>
+
+### Automated Backups
+
+Set up scheduled backups:
+
+1. Navigate to **Datacenter** → **Backup**
+2. Click **Add**
+3. Configure:
+   - Storage location
+   - Schedule (e.g., daily at 2 AM)
+   - Retention policy
+   - Compression method
+
+<Tip>
+**Recommended Backup Settings:**
+- Mode: Snapshot
+- Compression: ZSTD
+- Retention: Keep 7 daily, 4 weekly backups
+</Tip>
+
+### Restore from Backup
+
+```bash
+# List available backups
+ls /var/lib/vz/dump/
+
+# Restore backup
+qmrestore /var/lib/vz/dump/vzdump-qemu-<VMID>-*.vma.zst <NEW_VMID>
+```
+
+## Updating Home Assistant
+
+Home Assistant updates are handled within the OS:
+
+<Steps>
+  <Step title="Check for Updates">
+    Navigate to **Settings** → **System** → **Updates** in Home Assistant
+  </Step>
+  
+  <Step title="Create Backup">
+    Always backup before updating:
+    - **Settings** → **System** → **Backups** → **Create Backup**
+  </Step>
+  
+  <Step title="Install Update">
+    Click **Update** and wait for completion (5-15 minutes)
+  </Step>
+</Steps>
+
+<Warning>
+Do NOT update Home Assistant OS from Proxmox. Always use the built-in update mechanism.
+</Warning>
+
+## Troubleshooting
+
+### VM Won't Start
+
+<AccordionGroup>
+  <Accordion title="Check VM Status">
+    ```bash
+    qm status <VMID>
+    ```
+  </Accordion>
+  
+  <Accordion title="View VM Logs">
+    ```bash
+    qm terminal <VMID>
+    ```
+  </Accordion>
+  
+  <Accordion title="Verify EFI Disk">
+    ```bash
+    qm config <VMID> | grep efidisk
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Can't Access Web Interface
+
+<Steps>
+  <Step title="Verify VM is Running">
+    ```bash
+    qm status <VMID>
+    ```
+  </Step>
+  
+  <Step title="Check IP Address">
+    From Proxmox console:
+    ```bash
+    qm guest cmd <VMID> network-get-interfaces
+    ```
+  </Step>
+  
+  <Step title="Wait for Boot">
+    Home Assistant takes 2-5 minutes to fully boot on first start
+  </Step>
+</Steps>
+
+### Disk Space Issues
+
+```bash
+# Check current disk usage
+qm config <VMID> | grep scsi0
+
+# Resize disk
+qm resize <VMID> scsi0 +32G
+```
+
+Then resize within Home Assistant:
+1. **Settings** → **System** → **Storage**
+2. Reboot to apply changes
+
+## Migration from Other Platforms
+
+### From Raspberry Pi
+
+<Steps>
+  <Step title="Create Backup on Pi">
+    Create a full backup in Home Assistant
+  </Step>
+  
+  <Step title="Download Backup">
+    Download the `.tar` backup file
+  </Step>
+  
+  <Step title="Install Fresh HAOS on Proxmox">
+    Use the script to create a new VM
+  </Step>
+  
+  <Step title="Restore Backup">
+    Upload and restore the backup in the new installation
+  </Step>
+</Steps>
+
+### From Docker/Supervised
+
+<Warning>
+Migrating from Docker or Supervised installations requires careful planning. Some add-ons may not be compatible.
+</Warning>
+
+Use the data copy tools:
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/copy-data/home-assistant-container-copy-data-home-assistant-core.sh)"
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Regular Backups" icon="floppy-disk">
+    - Daily automated backups
+    - Before major updates
+    - Before adding integrations
+    - Store off-host
+  </Card>
+  
+  <Card title="Resource Monitoring" icon="chart-line">
+    - Monitor CPU usage
+    - Watch memory consumption
+    - Check disk space
+    - Review logs regularly
+  </Card>
+  
+  <Card title="Security" icon="shield">
+    - Use strong passwords
+    - Enable 2FA
+    - Keep HA updated
+    - Use HTTPS (reverse proxy)
+  </Card>
+  
+  <Card title="Network Isolation" icon="network-wired">
+    - Separate IoT VLAN
+    - Firewall rules
+    - No direct internet access
+    - Use VPN for remote access
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Add USB Devices" icon="usb" href="/tools/usb-passthrough">
+    Configure USB passthrough for Zigbee/Z-Wave
+  </Card>
+  
+  <Card title="Network Security" icon="shield" href="/guides/networking">
+    Set up VLANs and firewall rules
+  </Card>
+  
+  <Card title="Reverse Proxy" icon="server" href="/guides/popular-apps">
+    Install Nginx Proxy Manager for HTTPS
+  </Card>
+</CardGroup>

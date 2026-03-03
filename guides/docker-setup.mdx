@@ -1,0 +1,638 @@
+---
+title: Docker Setup Guide
+description: Complete guide to setting up Docker on Proxmox VE using LXC containers or VMs
+---
+
+Docker is essential for running containerized applications. This guide covers multiple methods for running Docker on Proxmox VE.
+
+## Installation Methods
+
+<CardGroup cols={2}>
+  <Card title="Alpine Docker LXC" icon="docker" color="#0db7ed">
+    **Lightweight Container**
+    - Minimal resource usage
+    - Fast deployment
+    - Best for: Simple Docker workloads
+  </Card>
+  
+  <Card title="Docker VM" icon="server">
+    **Full Virtual Machine**
+    - Complete isolation
+    - Multiple OS options
+    - Best for: Production environments
+  </Card>
+</CardGroup>
+
+## Alpine Docker Container (LXC)
+
+### Quick Installation
+
+<Steps>
+  <Step title="Run the Alpine Docker Script">
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/alpine-docker.sh)"
+    ```
+  </Step>
+  
+  <Step title="Container Configuration">
+    Default settings:
+    - **CPU:** 1 core
+    - **RAM:** 1024 MB
+    - **Disk:** 2 GB
+    - **OS:** Alpine 3.23
+    - **Unprivileged:** Yes
+  </Step>
+  
+  <Step title="Verify Installation">
+    ```bash
+    pct enter <CTID>
+    docker --version
+    docker ps
+    ```
+  </Step>
+</Steps>
+
+### Why Alpine?
+
+<CardGroup cols={3}>
+  <Card title="Lightweight" icon="feather">
+    Base container ~50 MB vs 300+ MB for Ubuntu
+  </Card>
+  
+  <Card title="Secure" icon="shield">
+    Minimal attack surface with fewer packages
+  </Card>
+  
+  <Card title="Fast" icon="bolt">
+    Quick startup and low resource usage
+  </Card>
+</CardGroup>
+
+## Docker VM (Full Installation)
+
+For production workloads, a full VM provides better isolation and flexibility.
+
+### Quick Installation
+
+<Steps>
+  <Step title="Run the Docker VM Script">
+    ```bash
+    bash -c "$(wget -qO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/docker-vm.sh)"
+    ```
+  </Step>
+  
+  <Step title="Choose Operating System">
+    Select from:
+    - **Debian 13 (Trixie)** - Latest
+    - **Debian 12 (Bookworm)** - Stable (recommended)
+    - **Ubuntu 24.04 LTS** - Long-term support
+    - **Ubuntu 22.04 LTS** - Older LTS
+  </Step>
+  
+  <Step title="Cloud-Init Configuration">
+    Enable Cloud-Init for:
+    - Automatic user setup
+    - SSH key injection
+    - Network configuration
+    - First-boot customization
+  </Step>
+  
+  <Step title="Wait for Installation">
+    The script will:
+    - Download OS image
+    - Pre-install Docker
+    - Configure networking
+    - Start the VM
+  </Step>
+</Steps>
+
+### Default VM Configuration
+
+| Setting | Default Value |
+|---------|---------------|
+| **VM ID** | Next available |
+| **Machine Type** | Q35 (Modern) |
+| **Disk Size** | 10 GB |
+| **Hostname** | docker |
+| **CPU Model** | Host |
+| **CPU Cores** | 2 |
+| **RAM** | 4096 MB |
+| **Network** | vmbr0 |
+
+<Tip>
+The Docker VM script pre-installs Docker during image creation, so it's ready immediately after first boot.
+</Tip>
+
+## Docker Configuration
+
+### Optimized Daemon Settings
+
+The scripts automatically configure Docker with optimized settings:
+
+```json
+{
+  "storage-driver": "overlay2",
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+```
+
+**Configuration location:** `/etc/docker/daemon.json`
+
+<Note>
+**overlay2** is the recommended storage driver for performance and stability.
+</Note>
+
+### Verify Docker Installation
+
+<Tabs>
+  <Tab title="LXC Container">
+    ```bash
+    # Enter the container
+    pct enter <CTID>
+    
+    # Check Docker version
+    docker --version
+    
+    # Test with hello-world
+    docker run hello-world
+    ```
+  </Tab>
+  
+  <Tab title="VM">
+    ```bash
+    # SSH into VM or use console
+    ssh root@<vm-ip>
+    
+    # Check Docker version
+    docker --version
+    
+    # Verify service is running
+    systemctl status docker
+    
+    # Test installation
+    docker run hello-world
+    ```
+  </Tab>
+</Tabs>
+
+## Running Docker Containers
+
+### Basic Container Management
+
+<Steps>
+  <Step title="Pull an Image">
+    ```bash
+    docker pull nginx:latest
+    ```
+  </Step>
+  
+  <Step title="Run a Container">
+    ```bash
+    docker run -d -p 80:80 --name webserver nginx:latest
+    ```
+  </Step>
+  
+  <Step title="View Running Containers">
+    ```bash
+    docker ps
+    ```
+  </Step>
+  
+  <Step title="View Logs">
+    ```bash
+    docker logs webserver
+    ```
+  </Step>
+</Steps>
+
+### Docker Compose
+
+Docker Compose is pre-installed in VMs. For Alpine containers:
+
+```bash
+# Install Docker Compose (Alpine)
+apk add docker-compose
+```
+
+Example `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: changeme
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+Run with:
+```bash
+docker-compose up -d
+```
+
+## Storage Configuration
+
+### Persistent Volumes
+
+For data persistence, use Docker volumes:
+
+```bash
+# Create a volume
+docker volume create mydata
+
+# Use in container
+docker run -v mydata:/data nginx:alpine
+
+# List volumes
+docker volume ls
+```
+
+### Bind Mounts
+
+Mount host directories:
+
+```bash
+# Create directory
+mkdir -p /opt/appdata
+
+# Mount in container
+docker run -v /opt/appdata:/data nginx:alpine
+```
+
+<Warning>
+For LXC containers, ensure the directory permissions match between host and container.
+</Warning>
+
+### Increasing Disk Space
+
+<Tabs>
+  <Tab title="LXC Container">
+    ```bash
+    # Resize container disk
+    pct resize <CTID> rootfs +10G
+    ```
+  </Tab>
+  
+  <Tab title="VM">
+    ```bash
+    # Resize VM disk
+    qm resize <VMID> scsi0 +10G
+    
+    # Inside VM, resize partition
+    growpart /dev/sda 1
+    resize2fs /dev/sda1
+    ```
+  </Tab>
+</Tabs>
+
+## Networking
+
+### Container Networking
+
+<CardGroup cols={2}>
+  <Card title="Bridge Network" icon="bridge">
+    Default Docker network
+    ```bash
+    docker network create mynetwork
+    ```
+  </Card>
+  
+  <Card title="Host Network" icon="network-wired">
+    Use host's network stack
+    ```bash
+    docker run --network host nginx
+    ```
+  </Card>
+</CardGroup>
+
+### Port Mapping
+
+```bash
+# Map container port to host
+docker run -p 8080:80 nginx
+
+# Map to specific interface
+docker run -p 192.168.1.100:8080:80 nginx
+
+# Map multiple ports
+docker run -p 80:80 -p 443:443 nginx
+```
+
+### Macvlan Network
+
+For containers to appear as separate devices on network:
+
+```bash
+# Create macvlan network
+docker network create -d macvlan \
+  --subnet=192.168.1.0/24 \
+  --gateway=192.168.1.1 \
+  -o parent=eth0 macvlan_net
+
+# Run container on macvlan
+docker run --network macvlan_net \
+  --ip=192.168.1.100 nginx
+```
+
+## Docker Management Tools
+
+### Portainer
+
+Web-based Docker management:
+
+```bash
+docker run -d \
+  -p 9000:9000 \
+  --name portainer \
+  --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v portainer_data:/data \
+  portainer/portainer-ce:latest
+```
+
+Access at: `http://<ip>:9000`
+
+### Dockge
+
+Docker Compose management UI:
+
+```bash
+# Or use the community script
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/dockge.sh)"
+```
+
+### Yacht
+
+Container management for beginners:
+
+```bash
+docker run -d \
+  -p 8001:8000 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v yacht:/config \
+  selfhostedpro/yacht
+```
+
+## Performance Optimization
+
+### CPU Limits
+
+Limit CPU usage:
+
+```bash
+# Limit to 50% of one core
+docker run --cpus="0.5" nginx
+
+# Limit to specific cores
+docker run --cpuset-cpus="0,1" nginx
+```
+
+### Memory Limits
+
+```bash
+# Set memory limit
+docker run -m 512m nginx
+
+# Set memory + swap limit
+docker run -m 512m --memory-swap 1g nginx
+```
+
+### Storage Optimization
+
+<Steps>
+  <Step title="Clean Unused Images">
+    ```bash
+    docker image prune -a
+    ```
+  </Step>
+  
+  <Step title="Clean Unused Volumes">
+    ```bash
+    docker volume prune
+    ```
+  </Step>
+  
+  <Step title="Clean Everything">
+    ```bash
+    docker system prune -a --volumes
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+Pruning removes all unused containers, images, and volumes. Ensure you have backups.
+</Warning>
+
+## Security Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Unprivileged Containers" icon="user-shield">
+    ```bash
+    # Run as non-root user
+    docker run --user 1000:1000 nginx
+    ```
+  </Card>
+  
+  <Card title="Read-Only Filesystem" icon="lock">
+    ```bash
+    # Mount root as read-only
+    docker run --read-only nginx
+    ```
+  </Card>
+  
+  <Card title="Limit Capabilities" icon="shield-halved">
+    ```bash
+    # Drop all capabilities
+    docker run --cap-drop=ALL nginx
+    ```
+  </Card>
+  
+  <Card title="Use Secrets" icon="key">
+    ```bash
+    # Use Docker secrets
+    echo "mypassword" | docker secret create db_pass -
+    ```
+  </Card>
+</CardGroup>
+
+### Rootless Docker
+
+For enhanced security, run Docker without root:
+
+```bash
+# Install rootless Docker
+curl -fsSL https://get.docker.com/rootless | sh
+
+# Enable at boot
+systemctl --user enable docker
+```
+
+## Backup and Restore
+
+### Backup Containers
+
+<Tabs>
+  <Tab title="Commit Container">
+    ```bash
+    # Save container as image
+    docker commit mycontainer mybackup:latest
+    
+    # Export image
+    docker save -o backup.tar mybackup:latest
+    ```
+  </Tab>
+  
+  <Tab title="Backup Volumes">
+    ```bash
+    # Backup volume to tar
+    docker run --rm \
+      -v myvolume:/data \
+      -v $(pwd):/backup \
+      alpine tar czf /backup/volume-backup.tar.gz /data
+    ```
+  </Tab>
+</Tabs>
+
+### Restore from Backup
+
+```bash
+# Load image
+docker load -i backup.tar
+
+# Restore volume
+docker run --rm \
+  -v myvolume:/data \
+  -v $(pwd):/backup \
+  alpine tar xzf /backup/volume-backup.tar.gz -C /
+```
+
+### Proxmox-Level Backup
+
+<Tip>
+Always backup the entire container/VM for complete restoration:
+```bash
+vzdump <CTID> --mode snapshot --compress zstd
+```
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Docker daemon not starting">
+    Check service status:
+    ```bash
+    systemctl status docker
+    journalctl -u docker -n 50
+    ```
+    
+    Restart Docker:
+    ```bash
+    systemctl restart docker
+    ```
+  </Accordion>
+  
+  <Accordion title="Permission denied errors">
+    Add user to docker group:
+    ```bash
+    usermod -aG docker $USER
+    ```
+    
+    Or use sudo:
+    ```bash
+    sudo docker ps
+    ```
+  </Accordion>
+  
+  <Accordion title="Out of disk space">
+    Check Docker disk usage:
+    ```bash
+    docker system df
+    ```
+    
+    Clean up:
+    ```bash
+    docker system prune -a
+    ```
+    
+    Resize container/VM disk
+  </Accordion>
+  
+  <Accordion title="Network connectivity issues">
+    Restart networking:
+    ```bash
+    systemctl restart docker
+    ```
+    
+    Check iptables:
+    ```bash
+    iptables -L DOCKER
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Topics
+
+### Docker Swarm
+
+For container orchestration:
+
+```bash
+# Initialize swarm
+docker swarm init
+
+# Deploy stack
+docker stack deploy -c docker-compose.yml mystack
+```
+
+### Custom Docker Registry
+
+Run a private registry:
+
+```bash
+docker run -d -p 5000:5000 \
+  --restart unless-stopped \
+  --name registry \
+  -v registry-data:/var/lib/registry \
+  registry:2
+```
+
+### Docker BuildKit
+
+Enable BuildKit for faster builds:
+
+```bash
+export DOCKER_BUILDKIT=1
+docker build -t myapp .
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Popular Apps" icon="star" href="/guides/popular-apps">
+    Explore pre-configured applications
+  </Card>
+  
+  <Card title="Networking" icon="network-wired" href="/guides/networking">
+    Advanced network configuration
+  </Card>
+  
+  <Card title="Security" icon="shield" href="/guides/security-hardening">
+    Harden your Docker setup
+  </Card>
+</CardGroup>

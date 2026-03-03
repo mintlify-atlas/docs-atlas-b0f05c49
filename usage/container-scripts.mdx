@@ -1,0 +1,188 @@
+---
+title: Container Scripts
+description: Learn how to run LXC container installation scripts
+---
+
+Container scripts automate the creation and configuration of LXC containers on Proxmox VE. These scripts handle everything from container creation to application installation.
+
+## Running Container Scripts
+
+<Steps>
+  <Step title="Access Proxmox Shell">
+    Open the Proxmox VE web interface and navigate to your node's Shell.
+  </Step>
+
+  <Step title="Execute the Script">
+    Run the script using bash with the curl command:
+
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/adguard.sh)"
+    ```
+
+    Or using the shorter helper.sh wrapper:
+
+    ```bash
+    bash -c "$(wget -qO - https://helper.sh)" -- -app adguard
+    ```
+  </Step>
+
+  <Step title="Configure Container Options">
+    The script will prompt you to configure:
+    - Container ID
+    - Hostname
+    - Disk size
+    - CPU cores
+    - RAM allocation
+    - Network settings (bridge, VLAN tag)
+    - Privileged/Unprivileged mode
+  </Step>
+
+  <Step title="Wait for Completion">
+    The script will automatically:
+    - Download the container template
+    - Create the LXC container
+    - Install the application
+    - Configure services
+    - Display access information
+  </Step>
+</Steps>
+
+## Available Container Scripts
+
+Container scripts are located in the `ct/` directory. Popular examples include:
+
+<CodeGroup>
+```bash Docker
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+```
+
+```bash Home Assistant
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/homeassistant.sh)"
+```
+
+```bash Nginx Proxy Manager
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/nginxproxymanager.sh)"
+```
+
+```bash Plex
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/plex.sh)"
+```
+</CodeGroup>
+
+## Customizing with Environment Variables
+
+You can customize container creation by setting environment variables before running the script:
+
+```bash
+# Set custom resources and settings
+export var_cpu="4"
+export var_ram="4096"
+export var_disk="20"
+export var_os="debian"
+export var_version="13"
+
+# Run the script
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+```
+
+### Common Environment Variables
+
+| Variable | Description | Default Example |
+|----------|-------------|----------------|
+| `var_cpu` | Number of CPU cores | `1`, `2`, `4` |
+| `var_ram` | RAM in MB | `512`, `2048`, `4096` |
+| `var_disk` | Disk size in GB | `2`, `4`, `10` |
+| `var_os` | Operating system | `debian`, `ubuntu` |
+| `var_version` | OS version | `13`, `24` |
+| `var_unprivileged` | Unprivileged container | `1` (yes), `0` (no) |
+| `var_tags` | Container tags | `docker`, `media` |
+
+<Note>
+Each script has different default values based on the application's requirements. Check the script header for defaults.
+</Note>
+
+## Script Structure
+
+All container scripts follow a standard structure:
+
+```bash
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+
+# Application metadata
+APP="Application Name"
+var_tags="${var_tags:-tag}"
+var_cpu="${var_cpu:-2}"
+var_ram="${var_ram:-2048}"
+var_disk="${var_disk:-4}"
+var_os="${var_os:-debian}"
+var_version="${var_version:-13}"
+var_unprivileged="${var_unprivileged:-1}"
+
+header_info "$APP"
+variables
+color
+catch_errors
+
+function update_script() {
+  # Update logic for the application
+}
+
+start
+build_container
+description
+```
+
+<Tip>
+The `build.func` file provides common functions like `build_container`, `header_info`, and error handling.
+</Tip>
+
+## Interactive vs Non-Interactive Mode
+
+### Interactive Mode (Default)
+
+Run the script normally to be prompted for each configuration option:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+```
+
+### Non-Interactive Mode
+
+Set `VERBOSE="no"` and provide all variables to run without prompts:
+
+```bash
+export VERBOSE="no"
+export var_cpu="2"
+export var_ram="2048"
+export var_disk="10"
+
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+```
+
+<Warning>
+Non-interactive mode requires all necessary variables to be set. Missing variables may cause the script to fail.
+</Warning>
+
+## Finding Container Scripts
+
+To see all available container scripts:
+
+```bash
+# List all container scripts
+ls /path/to/ProxmoxVE/ct/
+
+# Or browse on GitHub
+# https://github.com/community-scripts/ProxmoxVE/tree/main/ct
+```
+
+Each script is named after the application it installs (e.g., `docker.sh`, `adguard.sh`, `plex.sh`).
+
+## Next Steps
+
+After creating a container:
+
+1. Access the application using the provided URL
+2. Use the [update script](/usage/update-scripts) to keep the application updated
+3. Add [management tools](/usage/management-tools) like Netdata for monitoring
+4. Configure backups in Proxmox VE

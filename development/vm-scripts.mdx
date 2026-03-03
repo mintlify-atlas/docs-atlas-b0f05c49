@@ -1,0 +1,556 @@
+---
+title: Creating VM Scripts
+description: Learn how to create virtual machine scripts for the vm/ directory with cloud-init provisioning
+---
+
+VM scripts (`vm/*.sh`) create full virtual machines (not containers) in Proxmox VE with complete operating systems and cloud-init provisioning. Unlike LXC containers, VMs provide full hardware virtualization and isolation.
+
+## Overview
+
+### VM vs Container
+
+| Feature | VM | Container |
+|---------|:---:|:---:|
+| Isolation | Full hardware virtualization | Lightweight process isolation |
+| Boot Time | Slower (full OS boot) | Instant |
+| Resource Use | Higher (full OS overhead) | Lower |
+| Use Case | Full OS, firewalls, routers | Single application |
+| Init System | systemd/init | cloud-init |
+| Storage | Disk image (qcow2, raw) | Filesystem |
+| Kernel | Own kernel | Shared host kernel |
+| Security | Complete isolation | Namespace isolation |
+
+### When to Use VMs
+
+Use VMs when you need:
+
+- **Full OS isolation** - Running untrusted workloads
+- **Custom kernels** - Special kernel modules or versions
+- **Hardware emulation** - GPU passthrough, USB devices
+- **Network appliances** - Firewalls (OPNsense, pfSense), routers (OpenWrt)
+- **Operating systems** - Windows, macOS, specialty Linux distros
+- **Home automation** - Home Assistant OS, Umbrel OS
+
+## VM Creation Flow
+
+```
+vm/OsName-vm.sh (Proxmox host)
+    │
+    ├─ Calls: build.func or custom logic
+    │
+    ├─ Variables: var_cpu, var_ram, var_disk, var_os
+    │
+    ├─ Uses: cloud-init.func (for cloud-init OSes)
+    │
+    └─ Creates: KVM/QEMU VM
+                │
+                ├─ Downloads: OS image (.qcow2, .img, .iso)
+                ├─ Imports: Disk into Proxmox storage
+                ├─ Configures: CPU, RAM, network, boot order
+                └─ Boots: With cloud-init or direct boot
+```
+
+## Complete VM Script Example
+
+<Tabs>
+  <Tab title="Home Assistant OS">
+    ```bash vm/haos-vm.sh
+    #!/usr/bin/env bash
+
+    # Copyright (c) 2021-2026 tteck
+    # Author: tteck (tteckster)
+    # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+
+    source /dev/stdin <<<$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/api.func)
+
+    function header_info {
+      clear
+      cat <<"EOF"
+        __  __                        ___              _      __              __     ____  _____
+       / / / /___  ____ ___  ___     /   |  __________(_)____/ /_____ _____  / /_   / __ \/ ___/
+      / /_/ / __ \/ __ `__ \/ _ \   / /| | / ___/ ___/ / ___/ __/ __ `/ __ \/ __/  / / / /\__ \
+     / __  / /_/ / / / / / /  __/  / ___ |(__  |__  ) (__  ) /_/ /_/ / / / / /_   / /_/ /___/ /
+    /_/ /_/\____/_/ /_/ /_/\___/  /_/  |_/____/____/_/____/\__/\__,_/_/ /_/\__/   \____//____/
+
+    EOF
+    }
+
+    header_info
+    echo -e "\n Loading..."
+
+    # Configuration
+    GEN_MAC=02:$(openssl rand -hex 5 | awk '{print toupper($0)}' | sed 's/\(..\)/\1:/g; s/.$$//')
+    RANDOM_UUID="$(cat /proc/sys/kernel/random/uuid)"
+    VERSIONS=(stable beta dev)
+    NSAPP="homeassistant-os"
+    var_os="homeassistant"
+    DISK_SIZE="32G"
+
+    # Fetch available versions
+    for version in "${VERSIONS[@]}"; do
+      eval "$version=$(curl -fsSL https://raw.githubusercontent.com/home-assistant/version/master/stable.json | grep '"ova"' | cut -d '"' -f 4)"
+    done
+
+    # Color codes
+    YW=$(echo "\033[33m")
+    BL=$(echo "\033[36m")
+    GN=$(echo "\033[1;92m")
+    CL=$(echo "\033[m")
+
+    # Setup error handling
+    set -e
+    trap 'error_handler $LINENO "$BASH_COMMAND"' ERR
+    trap cleanup EXIT
+
+    function get_valid_nextid() {
+      local try_id
+      try_id=$(pvesh get /cluster/nextid)
+      while true; do
+        if [ -f "/etc/pve/qemu-server/${try_id}.conf" ] || [ -f "/etc/pve/lxc/${try_id}.conf" ]; then
+          try_id=$((try_id + 1))
+          continue
+        fi
+        break
+      done
+      echo "$try_id"
+    }
+
+    function default_settings() {
+      BRANCH="$stable"
+      VMID=$(get_valid_nextid)
+      MACHINE="q35"
+      DISK_SIZE="32G"
+      HN="haos-${BRANCH}"
+      CORE_COUNT="2"
+      RAM_SIZE="4096"
+      BRG="vmbr0"
+      MAC="$GEN_MAC"
+      START_VM="yes"
+      METHOD="default"
+    }
+
+    function start_script() {
+      if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "SETTINGS" --yesno "Use Default Settings?" --no-button Advanced 10 58); then
+        header_info
+        echo -e "${BL}Using Default Settings${CL}"
+        default_settings
+      else
+        header_info
+        echo -e "${RD}Using Advanced Settings${CL}"
+        advanced_settings
+      fi
+    }
+
+    start_script
+
+    # Download and validate image
+    URL="https://github.com/home-assistant/operating-system/releases/download/${BRANCH}/haos_ova-${BRANCH}.qcow2.xz"
+    CACHE_DIR="/var/lib/vz/template/cache"
+    CACHE_FILE="$CACHE_DIR/$(basename "$URL")"
+
+    msg_info "Downloading Home Assistant OS ${BRANCH}"
+    wget -q "$URL" -O "$CACHE_FILE"
+    msg_ok "Downloaded"
+
+    # Extract image
+    FILE_IMG="/var/lib/vz/template/tmp/${CACHE_FILE##*/%.xz}"
+    msg_info "Extracting image"
+    xz -dc "$CACHE_FILE" | pv -N "Extracting" >"$FILE_IMG"
+    msg_ok "Extracted"
+
+    # Create VM
+    msg_info "Creating Home Assistant OS VM"
+    qm create $VMID -machine q35 -bios ovmf -agent 1 -tablet 0 -localtime 1 \
+      -cores "$CORE_COUNT" -memory "$RAM_SIZE" -name "$HN" -tags community-script \
+      -net0 "virtio,bridge=$BRG,macaddr=$MAC" -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
+    msg_ok "Created VM shell"
+
+    # Import disk
+    msg_info "Importing disk"
+    DISK_REF=$(qm disk import "$VMID" "$FILE_IMG" "$STORAGE" --format raw 2>&1 | \
+      sed -n "s/.*successfully imported disk '\([^']\+\)'.*/\1/p")
+    msg_ok "Imported disk (${DISK_REF})"
+
+    # Configure VM
+    msg_info "Configuring VM"
+    qm set $VMID \
+      --efidisk0 ${STORAGE}:0,efitype=4m \
+      --scsi0 ${DISK_REF},ssd=1,discard=on \
+      --boot order=scsi0 \
+      --serial0 socket
+    qm resize $VMID scsi0 ${DISK_SIZE}
+    msg_ok "Configured VM"
+
+    # Start VM
+    if [ "$START_VM" == "yes" ]; then
+      msg_info "Starting VM"
+      qm start $VMID
+      msg_ok "Started VM"
+    fi
+
+    msg_ok "Completed successfully!\n"
+    ```
+  </Tab>
+  
+  <Tab title="Debian Cloud-Init">
+    ```bash vm/debian-vm.sh
+    #!/usr/bin/env bash
+    source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+
+    # VM Configuration
+    APP="Debian"
+    var_os="debian"
+    var_version="12"
+    var_cpu="2"
+    var_ram="2048"
+    var_disk="20"
+
+    header_info "$APP"
+    variables
+    color
+    catch_errors
+
+    # Download cloud image
+    IMAGE_URL="https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+    IMAGE_FILE="/var/lib/vz/template/cache/debian-12-cloudimg.qcow2"
+
+    msg_info "Downloading Debian cloud image"
+    wget -q "$IMAGE_URL" -O "$IMAGE_FILE"
+    msg_ok "Downloaded cloud image"
+
+    # Get next available VM ID
+    VMID=$(pvesh get /cluster/nextid)
+
+    # Create VM
+    msg_info "Creating VM $VMID"
+    qm create $VMID \
+      --name "debian-${var_version}" \
+      --memory $var_ram \
+      --cores $var_cpu \
+      --net0 virtio,bridge=vmbr0 \
+      --serial0 socket \
+      --vga serial0
+    msg_ok "Created VM"
+
+    # Import disk
+    msg_info "Importing disk"
+    qm importdisk $VMID "$IMAGE_FILE" local-lvm
+    qm set $VMID --scsihw virtio-scsi-pci --scsi0 local-lvm:vm-${VMID}-disk-0
+    qm set $VMID --boot c --bootdisk scsi0
+    msg_ok "Imported disk"
+
+    # Configure cloud-init
+    msg_info "Configuring cloud-init"
+    qm set $VMID --ide2 local-lvm:cloudinit
+    qm set $VMID --ciuser root
+    qm set $VMID --cipassword $(openssl rand -base64 12)
+    qm set $VMID --ipconfig0 ip=dhcp
+    msg_ok "Configured cloud-init"
+
+    # Resize disk
+    qm resize $VMID scsi0 +${var_disk}G
+
+    msg_ok "VM created successfully!\n"
+    echo "VM ID: $VMID"
+    echo "Start with: qm start $VMID"
+    ```
+  </Tab>
+</Tabs>
+
+## Cloud-Init Provisioning
+
+Many modern VM scripts use cloud-init for initial configuration. Cloud-init is a standard for customizing cloud instances.
+
+### Cloud-Init Configuration
+
+```yaml
+#cloud-config
+hostname: myvm
+timezone: UTC
+
+packages:
+  - curl
+  - wget
+  - git
+  - htop
+
+users:
+  - name: admin
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2E...
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: sudo
+    shell: /bin/bash
+
+runcmd:
+  - apt-get update
+  - apt-get upgrade -y
+  - echo "VM provisioned successfully" > /root/setup-complete.txt
+```
+
+### Setting Cloud-Init in Proxmox
+
+```bash
+# Set cloud-init configuration
+qm set $VMID --ide2 local-lvm:cloudinit
+
+# Set user credentials
+qm set $VMID --ciuser root
+qm set $VMID --cipassword $(openssl rand -base64 12)
+
+# Set SSH keys
+qm set $VMID --sshkeys ~/.ssh/authorized_keys
+
+# Set network configuration
+qm set $VMID --ipconfig0 ip=dhcp
+# Or static IP:
+qm set $VMID --ipconfig0 ip=192.168.1.100/24,gw=192.168.1.1
+
+# Set DNS
+qm set $VMID --nameserver 8.8.8.8
+qm set $VMID --searchdomain example.com
+```
+
+## VM Script Components
+
+### 1. Header & Initialization
+
+```bash
+#!/usr/bin/env bash
+# Copyright (c) 2021-2026 community-scripts ORG
+# Author: YourUsername
+# License: MIT
+
+source /dev/stdin <<<$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/api.func)
+
+function header_info {
+  clear
+  cat <<"EOF"
+    ____  ____    _   _
+   / __ \/ ___\  | \ | | __ _ _ __ ___   ___
+  / / _` \___ \  |  \| |/ _` | '_ ` _ \ / _ \
+ | | (_| |___) | | |\  | (_| | | | | | |  __/
+  \ \__,_|____/  |_| \_|\__,_|_| |_| |_|\___|
+   \____/
+EOF
+}
+
+header_info
+```
+
+### 2. Configuration Variables
+
+```bash
+# VM Configuration
+VMID=$(pvesh get /cluster/nextid)
+VM_NAME="debian-12"
+CORE_COUNT="2"
+RAM_SIZE="2048"
+DISK_SIZE="20G"
+BRIDGE="vmbr0"
+MAC_ADDR=$(openssl rand -hex 6 | sed 's/\(..\)/\1:/g; s/:$//')
+STORAGE="local-lvm"
+```
+
+### 3. Image Download
+
+<CodeGroup>
+```bash Direct Download
+# Download OS image
+IMAGE_URL="https://example.com/os-image.qcow2"
+IMAGE_FILE="/var/lib/vz/template/cache/os-image.qcow2"
+
+msg_info "Downloading OS image"
+wget -q "$IMAGE_URL" -O "$IMAGE_FILE"
+msg_ok "Downloaded"
+```
+
+```bash Cached Download
+# Use cache if available
+IMAGE_URL="https://example.com/os-image.qcow2.xz"
+CACHE_DIR="/var/lib/vz/template/cache"
+CACHE_FILE="$CACHE_DIR/$(basename "$IMAGE_URL")"
+
+if [[ ! -f "$CACHE_FILE" ]] || ! xz -t "$CACHE_FILE" &>/dev/null; then
+  msg_info "Downloading image"
+  wget -q "$IMAGE_URL" -O "$CACHE_FILE"
+  msg_ok "Downloaded"
+else
+  msg_ok "Using cached image"
+fi
+```
+</CodeGroup>
+
+### 4. VM Creation
+
+```bash
+# Create VM with qm
+msg_info "Creating VM $VMID"
+qm create $VMID \
+  -machine q35 \
+  -bios ovmf \
+  -name "$VM_NAME" \
+  -cores "$CORE_COUNT" \
+  -memory "$RAM_SIZE" \
+  -net0 "virtio,bridge=$BRIDGE,macaddr=$MAC_ADDR" \
+  -ostype l26 \
+  -scsihw virtio-scsi-pci \
+  -agent 1 \
+  -onboot 1 \
+  -tags community-script
+msg_ok "Created VM"
+```
+
+### 5. Disk Import
+
+```bash
+# Import disk image
+msg_info "Importing disk"
+DISK_REF=$(qm disk import "$VMID" "$IMAGE_FILE" "$STORAGE" --format raw 2>&1 | \
+  sed -n "s/.*successfully imported disk '\([^']\+\)'.*/\1/p")
+
+if [[ -z "$DISK_REF" ]]; then
+  msg_error "Failed to import disk"
+  exit 1
+fi
+
+msg_ok "Imported disk (${DISK_REF})"
+```
+
+### 6. VM Configuration
+
+```bash
+# Configure boot disk and EFI
+msg_info "Configuring VM"
+qm set $VMID \
+  --efidisk0 ${STORAGE}:0,efitype=4m \
+  --scsi0 ${DISK_REF},ssd=1,discard=on \
+  --boot order=scsi0 \
+  --serial0 socket
+
+# Resize disk
+qm resize $VMID scsi0 ${DISK_SIZE}
+
+msg_ok "Configured VM"
+```
+
+### 7. Start VM
+
+```bash
+# Start VM if requested
+if [ "$START_VM" == "yes" ]; then
+  msg_info "Starting VM"
+  qm start $VMID
+  msg_ok "Started VM"
+fi
+```
+
+## Common VM Types
+
+### Network Appliances
+
+- **OPNsense** - Firewall and router
+- **pfSense** - Firewall and router
+- **OpenWrt** - Router and network appliance
+- **MikroTik RouterOS** - Enterprise router OS
+
+### Operating Systems
+
+- **Ubuntu** - Popular Linux distribution
+- **Debian** - Stable Linux distribution
+- **Arch Linux** - Rolling release Linux
+- **Windows** - Windows Server or Desktop
+
+### Home Automation
+
+- **Home Assistant OS** - Home automation platform
+- **Umbrel OS** - Personal server OS
+
+### Specialized Systems
+
+- **TrueNAS** - Network attached storage
+- **Proxmox Backup Server** - Backup solution
+
+## Best Practices
+
+<Warning>
+  Always validate downloaded images before importing them into VMs to prevent corruption.
+</Warning>
+
+### DO:
+
+- **Use q35 machine type** for modern VMs (supports PCIe, UEFI)
+- **Enable QEMU guest agent** with `-agent 1` for better integration
+- **Use virtio drivers** for best performance (`virtio,virtio-scsi-pci`)
+- **Cache downloaded images** to avoid repeated downloads
+- **Validate images** with checksums or test decompression
+- **Set meaningful VM names** for easy identification
+- **Tag VMs** with `community-script` tag
+- **Use EFI boot** for modern operating systems
+
+### DON'T:
+
+- Use i440fx machine type unless required for compatibility
+- Forget to enable agent for cloud-init VMs
+- Hardcode VM IDs - always use `pvesh get /cluster/nextid`
+- Skip image validation - corrupted images cause cryptic errors
+- Use excessive resources - VMs have more overhead than containers
+
+## Troubleshooting
+
+### VM Won't Boot
+
+**Check boot order**:
+```bash
+qm config $VMID | grep boot
+```
+
+**Verify disk is attached**:
+```bash
+qm config $VMID | grep scsi0
+```
+
+### Cloud-Init Not Working
+
+**Check cloud-init drive**:
+```bash
+qm config $VMID | grep ide2
+```
+
+**Verify cloud-init inside VM**:
+```bash
+# Inside the VM
+cloud-init status
+cloud-init status --long
+```
+
+### Disk Import Fails
+
+**Check storage**:
+```bash
+pvesm status
+```
+
+**Verify image file**:
+```bash
+file /path/to/image.qcow2
+qemu-img info /path/to/image.qcow2
+```
+
+## Contribution Checklist
+
+Before submitting a VM script:
+
+- [ ] Shebang is `#!/usr/bin/env bash`
+- [ ] Copyright header with author
+- [ ] Clear header ASCII art
+- [ ] Uses `pvesh get /cluster/nextid` for VM ID
+- [ ] Validates downloaded images
+- [ ] Uses q35 machine type (unless i440fx required)
+- [ ] Enables QEMU guest agent
+- [ ] Sets proper boot order
+- [ ] Includes EFI disk for UEFI boot
+- [ ] Tags VM with `community-script`
+- [ ] Cleans up temporary files
+- [ ] Tested VM boots successfully
+- [ ] Documented any special requirements

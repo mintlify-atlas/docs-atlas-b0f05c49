@@ -1,0 +1,493 @@
+---
+title: Maintenance Operations
+description: Routine maintenance tasks, cleanup operations, and system health management for Proxmox VE
+---
+
+Maintenance operations help keep your Proxmox VE environment healthy, optimized, and running efficiently. These scripts automate routine tasks and help prevent common issues.
+
+## Regular Maintenance Tasks
+
+### System Updates
+
+#### Update All LXC Containers
+
+Keep all containers up-to-date with the latest packages:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs.sh)"
+```
+
+<Accordion title="Update Process">
+1. Detects all LXC containers on the host
+2. Allows selection of containers to skip
+3. Option to skip stopped containers
+4. Automatically identifies package manager (apt, apk, dnf, yum, pacman)
+5. Runs update and upgrade commands
+6. Reports success or failure for each container
+</Accordion>
+
+<Note>
+For automated updates, use the cron-based version:
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs-cron.sh)"
+```
+This installs a weekly cron job for automatic container updates.
+</Note>
+
+#### Update Applications
+
+Update self-hosted applications within containers:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-apps.sh)"
+```
+
+Supports automatic updates for:
+- Docker containers
+- Node.js applications
+- Python applications
+- Custom update scripts
+- Binary-based applications
+
+### Cleanup Operations
+
+#### Container Cleanup
+
+Remove unnecessary packages and clear cache:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/clean-lxcs.sh)"
+```
+
+<CardGroup cols={2}>
+  <Card title="Package Cache" icon="trash">
+    Clears APT/DNF/YUM package caches to free disk space
+  </Card>
+  <Card title="Unused Packages" icon="box-open">
+    Removes automatically installed packages no longer needed
+  </Card>
+  <Card title="Log Rotation" icon="rotate">
+    Truncates old log files
+  </Card>
+  <Card title="Temp Files" icon="file">
+    Cleans temporary directories
+  </Card>
+</CardGroup>
+
+**What gets cleaned:**
+- `/var/cache/apt/archives/` (Debian/Ubuntu)
+- `/var/cache/dnf/` (Fedora/Rocky)
+- `/var/cache/yum/` (CentOS)
+- `/tmp/` temporary files
+- Orphaned packages
+- Old log files
+
+#### Clean Orphaned LVM Volumes
+
+Remove LVM volumes no longer associated with containers:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/clean-orphaned-lvm.sh)"
+```
+
+<Warning>
+This script permanently deletes orphaned volumes. Ensure you have backups before running.
+</Warning>
+
+The script:
+- Scans for LVM volumes not linked to any container
+- Lists orphaned volumes with sizes
+- Prompts for confirmation before deletion
+- Removes selected volumes and frees space
+
+#### Kernel Cleanup
+
+Remove old kernel versions:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/kernel-clean.sh)"
+```
+
+<Accordion title="Kernel Cleanup Process">
+1. Detects currently running kernel (automatically excluded)
+2. Lists all installed kernel versions
+3. Displays kernel sizes
+4. Allows interactive selection of kernels to remove
+5. Removes selected kernel packages and associated files
+6. Updates GRUB configuration
+</Accordion>
+
+**Benefits:**
+- Frees `/boot` partition space
+- Reduces package update overhead
+- Simplifies kernel management
+- Prevents boot partition full errors
+
+## Storage Maintenance
+
+### FSTRIM for SSDs
+
+Optimize SSD performance with periodic TRIM operations:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/fstrim.sh)"
+```
+
+<Note>
+FSTRIM helps maintain SSD performance and longevity by informing the SSD which blocks are no longer in use.
+</Note>
+
+**What it does:**
+- Enables weekly fstrim.timer systemd service
+- Runs TRIM on all mounted filesystems with SSD support
+- Logs TRIM operations for monitoring
+- Configurable schedule via systemd timer
+
+**Check TRIM status:**
+
+```bash
+# View timer status
+systemctl status fstrim.timer
+
+# View last TRIM operation
+journalctl -u fstrim.service
+
+# Manually run TRIM
+systemctl start fstrim.service
+```
+
+### Backup Operations
+
+#### Host Configuration Backup
+
+Backup critical Proxmox host configuration:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/host-backup.sh)"
+```
+
+<Accordion title="Backup Includes">
+- `/etc/` - System configuration files
+- `/etc/pve/` - Proxmox VE configuration
+- `/etc/network/` - Network settings
+- `/etc/apt/` - Repository configuration
+- Custom directories (optional)
+</Accordion>
+
+**Usage example:**
+
+1. Run the script
+2. Specify backup destination (default: `/root/`)
+3. Choose directory to backup (default: `/etc/`)
+4. Select specific subdirectories or backup all
+5. Script creates compressed tar archive
+
+**Restore from backup:**
+
+```bash
+# Extract backup
+tar -xzf hostname-etc-backup.tar.gz -C /
+
+# Verify files
+ls -la /etc/
+
+# Restart services if needed
+systemctl restart pveproxy pvedaemon
+```
+
+#### Container Backup and Restore
+
+Restore containers from Proxmox backups:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/container-restore-from-backup.sh)"
+```
+
+**Features:**
+- Lists available backup files
+- Allows selection of backup to restore
+- Prompts for new container ID
+- Configures storage and resources
+- Starts container after restore
+
+## Performance Optimization
+
+### CPU Microcode Updates
+
+Install latest CPU microcode for security and stability:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/microcode.sh)
+```
+
+<CardGroup cols={2}>
+  <Card title="Intel" icon="microchip">
+    Installs intel-microcode and updates Intel CPU firmware
+  </Card>
+  <Card title="AMD" icon="microchip">
+    Installs amd64-microcode and updates AMD CPU firmware
+  </Card>
+</CardGroup>
+
+**Why update microcode:**
+- Security vulnerability patches (Spectre, Meltdown, etc.)
+- CPU stability improvements
+- Bug fixes and performance enhancements
+- Thermal management improvements
+
+**Verify microcode version:**
+
+```bash
+# Intel
+dmesg | grep microcode
+
+# AMD  
+dmesg | grep microcode
+
+# Current microcode version
+grep microcode /proc/cpuinfo
+```
+
+### CPU Scaling Governor
+
+Optimize CPU frequency scaling:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/scaling-governor.sh)"
+```
+
+<Accordion title="Available Governors">
+- **performance**: Maximum frequency always (best for compute-heavy loads)
+- **powersave**: Minimum frequency always (best for power efficiency)
+- **ondemand**: Dynamic scaling based on CPU load (balanced approach)
+- **conservative**: Similar to ondemand but more gradual (smooth transitions)
+- **schedutil**: Scheduler-driven frequency selection (modern default)
+</Accordion>
+
+**When to use each governor:**
+
+| Governor | Use Case | Power Usage | Performance |
+|----------|----------|-------------|-------------|
+| performance | Databases, transcoding, VMs | High | Maximum |
+| powersave | Low-load servers, home labs | Minimum | Variable |
+| ondemand | General purpose servers | Moderate | Good |
+| conservative | Media servers, file servers | Low-Moderate | Good |
+| schedutil | Modern kernels (5.9+) | Optimized | Excellent |
+
+**Check current governor:**
+
+```bash
+cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+```
+
+### NIC Offloading Fixes
+
+Resolve network performance issues:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/nic-offloading-fix.sh)"
+```
+
+<Warning>
+NIC offloading can cause packet corruption in some virtualization scenarios. Disable if experiencing network issues.
+</Warning>
+
+**Common symptoms of offloading problems:**
+- Packet corruption in VMs/containers
+- Slow network performance
+- Connection drops
+- Checksums errors
+
+**What the script disables:**
+- TCP segmentation offload (TSO)
+- Generic segmentation offload (GSO)
+- Generic receive offload (GRO)
+- Large receive offload (LRO)
+- RX/TX checksumming
+
+## Health Monitoring
+
+### Monitor All Instances
+
+Automatically monitor and restart failed instances:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/monitor-all.sh)"
+```
+
+<Accordion title="Monitoring Features">
+- **Continuous ping monitoring**: Checks instance responsiveness every minute
+- **Tag-based filtering**: Only monitors instances with `mon-restart` tag
+- **Automatic restart**: Restarts instances that fail ping checks
+- **Systemd service**: Runs as background service
+- **Logging**: Records all restart events
+</Accordion>
+
+**Setup process:**
+
+1. Run the installation script
+2. Service is installed as systemd unit
+3. Tag instances you want monitored:
+
+```bash
+# For VMs
+qm set <vmid> -tags mon-restart
+
+# For Containers  
+pct set <ctid> -tags mon-restart
+```
+
+**Manage the monitoring service:**
+
+```bash
+# Check status
+systemctl status ping-instances
+
+# View logs
+journalctl -u ping-instances -f
+
+# Restart service
+systemctl restart ping-instances
+
+# Stop monitoring
+systemctl stop ping-instances
+
+# Disable monitoring
+systemctl disable ping-instances
+```
+
+**Remove monitoring:**
+
+To stop monitoring specific instances, remove the tag:
+
+```bash
+qm set <vmid> -tags ""
+pct set <ctid> -tags ""
+```
+
+## Maintenance Schedules
+
+### Recommended Maintenance Calendar
+
+<Accordion title="Daily Tasks">
+- Check systemd journal for errors: `journalctl -p err -b`
+- Monitor disk usage: `df -h`
+- Review backup status
+- Check container/VM status in web UI
+</Accordion>
+
+<Accordion title="Weekly Tasks">
+- Update containers: `update-lxcs.sh`
+- Review security updates
+- Check monitoring alerts
+- Verify backup integrity
+- Run FSTRIM (automatic if configured)
+</Accordion>
+
+<Accordion title="Monthly Tasks">
+- Clean container caches: `clean-lxcs.sh`
+- Remove old kernels: `kernel-clean.sh`
+- Update Proxmox host: `apt update && apt dist-upgrade`
+- Review and rotate logs
+- Test backup restoration
+- Update microcode if new versions available
+- Check storage pool health
+</Accordion>
+
+<Accordion title="Quarterly Tasks">
+- Clean orphaned LVM volumes: `clean-orphaned-lvm.sh`
+- Review and optimize resource allocation
+- Test disaster recovery procedures
+- Update documentation
+- Review and update network configuration
+- Perform security audit
+</Accordion>
+
+<Accordion title="Yearly Tasks">
+- Plan and execute major version upgrades
+- Review hardware health and consider replacements
+- Audit user access and permissions
+- Review and update security policies
+- Archive old backups to long-term storage
+</Accordion>
+
+## Automation with Cron
+
+### Setup Automated Maintenance
+
+Create a custom maintenance script:
+
+```bash
+#!/usr/bin/env bash
+# /usr/local/bin/maintenance.sh
+
+LOGFILE="/var/log/proxmox-maintenance.log"
+
+echo "[$(date)] Starting maintenance" >> "$LOGFILE"
+
+# Update containers
+echo "[$(date)] Updating containers" >> "$LOGFILE"
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs.sh)" >> "$LOGFILE" 2>&1
+
+# Clean containers
+echo "[$(date)] Cleaning containers" >> "$LOGFILE"
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/clean-lxcs.sh)" >> "$LOGFILE" 2>&1
+
+# Backup host config
+echo "[$(date)] Backing up host configuration" >> "$LOGFILE"
+tar -czf /root/host-backup-$(date +%Y%m%d).tar.gz /etc/pve /etc/network >> "$LOGFILE" 2>&1
+
+echo "[$(date)] Maintenance complete" >> "$LOGFILE"
+```
+
+Make it executable:
+
+```bash
+chmod +x /usr/local/bin/maintenance.sh
+```
+
+Schedule with cron:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add weekly maintenance (Sundays at 3 AM)
+0 3 * * 0 /usr/local/bin/maintenance.sh
+
+# Add monthly cleanup (1st of month at 2 AM)
+0 2 1 * * /usr/local/bin/cleanup.sh
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Before Maintenance" icon="clipboard-check">
+    - Create backups
+    - Schedule during low-usage periods
+    - Notify users of planned maintenance
+    - Test in non-production first
+  </Card>
+  <Card title="During Maintenance" icon="wrench">
+    - Monitor logs in real-time
+    - Keep rollback plan ready
+    - Document any issues
+    - Take before/after snapshots
+  </Card>
+  <Card title="After Maintenance" icon="check">
+    - Verify all services running
+    - Check monitoring dashboards
+    - Review logs for errors
+    - Update maintenance documentation
+  </Card>
+  <Card title="Emergency Response" icon="triangle-exclamation">
+    - Keep backup restoration tested
+    - Document rollback procedures
+    - Maintain emergency contact list
+    - Have offline documentation available
+  </Card>
+</CardGroup>
+
+<Note>
+Regular maintenance prevents emergencies. Establish and follow a consistent maintenance schedule to keep your Proxmox environment healthy and reliable.
+</Note>

@@ -1,122 +1,155 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Proxmox VE Helper Scripts",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#4c9b3f",
+    "light": "#5db34d",
+    "dark": "#3a7a30"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/community-scripts/ProxmoxVE"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/community-scripts/ProxmoxVE",
+      "discord": "https://discord.gg/3AnUqsXnmK",
+      "website": "https://helper-scripts.com"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation-methods"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/architecture",
+              "concepts/containers-vs-vms",
+              "concepts/script-structure"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Using Scripts",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "usage/container-scripts",
+              "usage/vm-scripts",
+              "usage/management-tools",
+              "usage/update-scripts"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Configuration",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "configuration/defaults-system",
+              "configuration/environment-variables",
+              "configuration/unattended-deployment"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/popular-apps",
+              "guides/home-assistant",
+              "guides/docker-setup",
+              "guides/networking",
+              "guides/security-hardening"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/exit-codes",
+              "troubleshooting/debug-mode",
+              "troubleshooting/logs"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Contributing",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Contributor Guide",
             "pages": [
-              "api-reference/introduction"
+              "contributing/getting-started",
+              "contributing/guidelines",
+              "contributing/code-of-conduct"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Development",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "development/container-scripts",
+              "development/install-scripts",
+              "development/vm-scripts",
+              "development/testing"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/technical-reference",
+              "architecture/function-libraries",
+              "architecture/build-process",
+              "architecture/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Script Reference",
+        "groups": [
+          {
+            "group": "Container Scripts",
+            "pages": [
+              "reference/containers/overview",
+              "reference/containers/debian-based",
+              "reference/containers/alpine-based",
+              "reference/containers/turnkey"
+            ]
+          },
+          {
+            "group": "VM Scripts",
+            "pages": [
+              "reference/vms/overview",
+              "reference/vms/linux-vms",
+              "reference/vms/haos",
+              "reference/vms/network-appliances"
+            ]
+          },
+          {
+            "group": "Management Tools",
+            "pages": [
+              "reference/tools/host-tools",
+              "reference/tools/addon-tools",
+              "reference/tools/maintenance"
+            ]
+          },
+          {
+            "group": "Function Libraries",
+            "pages": [
+              "reference/functions/build",
+              "reference/functions/install",
+              "reference/functions/tools",
+              "reference/functions/api"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

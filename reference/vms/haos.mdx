@@ -1,0 +1,422 @@
+---
+title: Home Assistant OS VM
+description: Install Home Assistant Operating System as a virtual machine in Proxmox VE
+---
+
+Home Assistant OS provides a complete home automation platform with add-ons, supervisor, and automatic updates.
+
+## Overview
+
+Home Assistant OS (HAOS) is the recommended installation method for Home Assistant, providing:
+
+- Full Supervisor access
+- Add-ons ecosystem
+- Automatic updates
+- Snapshot/backup functionality
+- Native integration support
+- Optimized for home automation
+
+## Standard Installation
+
+### Home Assistant OS VM
+
+The main HAOS VM script for standard Proxmox VE installations.
+
+**Script:** `haos-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/haos-vm.sh)"
+```
+
+<Steps>
+  <Step title="Execute the Script">
+    Run the command above from your Proxmox VE shell.
+  </Step>
+  
+  <Step title="Select Version Channel">
+    Choose between:
+    - **Stable** (recommended for production)
+    - **Beta** (test upcoming features)
+    - **Dev** (bleeding edge, for developers)
+  </Step>
+  
+  <Step title="Configure VM">
+    Set the following:
+    - VM ID
+    - Hostname
+    - CPU cores (recommended: 2)
+    - RAM (recommended: 4096 MB)
+    - Disk size (recommended: 32 GB)
+    - Network bridge
+  </Step>
+  
+  <Step title="Wait for Installation">
+    The script downloads the HAOS image and creates the VM.
+  </Step>
+  
+  <Step title="Access Home Assistant">
+    After the VM starts, access the web interface:
+    ```
+    http://homeassistant.local:8123
+    ```
+    Or use the VM's IP address:
+    ```
+    http://VM-IP-ADDRESS:8123
+    ```
+  </Step>
+</Steps>
+
+## Raspberry Pi Installation
+
+### Home Assistant OS for Pimox
+
+Special version for Proxmox running on Raspberry Pi (Pimox).
+
+**Script:** `pimox-haos-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/pimox-haos-vm.sh)"
+```
+
+<Note>
+This script is specifically designed for Proxmox VE running on Raspberry Pi hardware. Use the standard `haos-vm.sh` for x86_64 systems.
+</Note>
+
+## Version Channels
+
+<AccordionGroup>
+  <Accordion title="Stable (Recommended)">
+    - Thoroughly tested releases
+    - Production-ready
+    - Recommended for daily use
+    - Regular security updates
+    - Best stability
+  </Accordion>
+  
+  <Accordion title="Beta">
+    - Preview upcoming features
+    - Generally stable
+    - Help test before stable release
+    - Minor bugs possible
+    - Good for enthusiasts
+  </Accordion>
+  
+  <Accordion title="Dev (Development)">
+    - Latest features
+    - Cutting-edge updates
+    - May have bugs
+    - For developers and testers
+    - Not for production use
+  </Accordion>
+</AccordionGroup>
+
+## Resource Requirements
+
+### Minimum Configuration
+
+- **CPU**: 2 cores
+- **RAM**: 2 GB (2048 MB)
+- **Disk**: 32 GB
+- **Network**: 1 Gbps recommended
+
+### Recommended Configuration
+
+- **CPU**: 2-4 cores
+- **RAM**: 4 GB (4096 MB)
+- **Disk**: 32-64 GB
+- **Network**: 1 Gbps
+
+### Advanced Configuration
+
+- **CPU**: 4+ cores (for many integrations)
+- **RAM**: 8 GB (for cameras, media, etc.)
+- **Disk**: 64+ GB (for recordings, backups)
+- **Network**: 1 Gbps + dedicated VLAN
+
+<Warning>
+Home Assistant OS requires at least 32 GB of disk space. The script sets this as the default.
+</Warning>
+
+## Initial Setup
+
+After the VM is created and started:
+
+<Steps>
+  <Step title="Wait for Boot">
+    First boot takes a few minutes as Home Assistant prepares the system.
+  </Step>
+  
+  <Step title="Access Web Interface">
+    Navigate to `http://homeassistant.local:8123` or `http://VM-IP:8123`
+  </Step>
+  
+  <Step title="Create Account">
+    Set up your primary user account:
+    - Name
+    - Username
+    - Password
+    - Confirm password
+  </Step>
+  
+  <Step title="Configure Location">
+    Set your home location for:
+    - Weather information
+    - Sun position
+    - Time zone
+    - Unit system (metric/imperial)
+  </Step>
+  
+  <Step title="Discover Devices">
+    Home Assistant automatically discovers compatible devices on your network.
+  </Step>
+</Steps>
+
+## Common Integrations
+
+<CardGroup cols={2}>
+  <Card title="Zigbee" icon="signal">
+    Connect Zigbee devices using Zigbee2MQTT or ZHA add-ons
+  </Card>
+  <Card title="Z-Wave" icon="wave-square">
+    Integrate Z-Wave devices with Z-Wave JS add-on
+  </Card>
+  <Card title="MQTT" icon="message">
+    Connect IoT devices via Mosquitto MQTT broker
+  </Card>
+  <Card title="ESPHome" icon="microchip">
+    Manage ESP32/ESP8266 devices directly
+  </Card>
+</CardGroup>
+
+## USB Device Passthrough
+
+For Zigbee/Z-Wave dongles, pass USB devices to the VM:
+
+<Steps>
+  <Step title="Identify USB Device">
+    On Proxmox host, list USB devices:
+    ```bash
+    lsusb
+    ```
+    Note the device ID (e.g., `10c4:ea60` for Zigbee dongle)
+  </Step>
+  
+  <Step title="Add USB Device to VM">
+    In Proxmox web UI:
+    1. Select the HAOS VM
+    2. Go to **Hardware**
+    3. Click **Add** → **USB Device**
+    4. Select **Use USB Vendor/Device ID**
+    5. Choose your device
+    6. Click **Add**
+  </Step>
+  
+  <Step title="Restart VM">
+    Restart the Home Assistant VM to detect the USB device.
+  </Step>
+  
+  <Step title="Configure in Home Assistant">
+    The USB device should now appear in Home Assistant integrations.
+  </Step>
+</Steps>
+
+<CodeGroup>
+
+```bash Alternative: USB Port Passthrough
+# Find USB port
+lsusb -t
+
+# In Proxmox, add USB by port (Hardware → Add → USB Device)
+# Select "Use USB Port" and choose the correct port
+```
+
+```bash Verify USB in VM
+# Access Home Assistant OS CLI (via Proxmox console)
+# Login (no password on fresh install)
+# Check USB devices
+lsusb
+
+# Check device path
+ls -la /dev/ttyUSB* /dev/ttyACM*
+```
+
+</CodeGroup>
+
+## Popular Add-ons
+
+### Essential Add-ons
+
+<Accordion title="File Editor">
+Edit configuration files directly from the web interface.
+
+**Installation:** Settings → Add-ons → Add-on Store → File Editor
+</Accordion>
+
+<Accordion title="Mosquitto MQTT Broker">
+Local MQTT broker for IoT device communication.
+
+**Installation:** Settings → Add-ons → Add-on Store → Mosquitto broker
+</Accordion>
+
+<Accordion title="Terminal & SSH">
+Command-line access to Home Assistant OS.
+
+**Installation:** Settings → Add-ons → Add-on Store → Terminal & SSH
+</Accordion>
+
+<Accordion title="Samba Share">
+Access configuration files over the network.
+
+**Installation:** Settings → Add-ons → Add-on Store → Samba share
+</Accordion>
+
+### Advanced Add-ons
+
+- **Zigbee2MQTT**: Alternative Zigbee integration
+- **Node-RED**: Visual automation programming
+- **ESPHome**: Manage ESP-based devices
+- **AppDaemon**: Advanced Python automation
+- **MariaDB**: Alternative database backend
+- **InfluxDB**: Time-series database for history
+
+## Backup and Restore
+
+### Create Backup
+
+<Steps>
+  <Step title="Navigate to Backups">
+    Settings → System → Backups
+  </Step>
+  
+  <Step title="Create New Backup">
+    Click **Create Backup**
+  </Step>
+  
+  <Step title="Choose Backup Type">
+    - **Full backup**: Everything (recommended)
+    - **Partial backup**: Select specific components
+  </Step>
+  
+  <Step title="Download Backup">
+    After creation, download the `.tar` file to safe location
+  </Step>
+</Steps>
+
+### Restore from Backup
+
+```bash
+# Upload backup file through Home Assistant UI
+# Settings → System → Backups → Upload Backup
+# Then click on the backup and select "Restore"
+```
+
+<Warning>
+Always keep backups in a separate location from your Proxmox host. Consider automating backups to external storage.
+</Warning>
+
+## Networking Considerations
+
+### Static IP Configuration
+
+<Accordion title="Set Static IP">
+It's recommended to assign a static IP to Home Assistant:
+
+1. **Via Router**: Reserve IP in DHCP settings (recommended)
+2. **Via Home Assistant**: Settings → System → Network → Configure IPv4
+</Accordion>
+
+### VLAN Configuration
+
+```bash
+# During VM creation, specify VLAN tag for IoT network isolation
+# Or configure after creation in Proxmox:
+# VM → Hardware → Network Device → Edit → VLAN Tag
+```
+
+### Port Requirements
+
+| Port | Protocol | Purpose |
+|------|----------|----------|
+| 8123 | TCP | Web Interface |
+| 8300 | TCP | Home Assistant Supervisor |
+| 4357 | TCP | Matter |
+| 5353 | UDP | mDNS (device discovery) |
+| 1883 | TCP | MQTT (if using Mosquitto) |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cannot access homeassistant.local">
+    - Use IP address instead: `http://VM-IP:8123`
+    - Check if mDNS/Avahi is working on your network
+    - Try accessing from same VLAN/subnet
+    - Flush DNS cache on your computer
+  </Accordion>
+  
+  <Accordion title="USB device not detected">
+    - Verify USB passthrough in Proxmox VM hardware
+    - Check `lsusb` output in VM console
+    - Try different USB port on host
+    - Ensure device is not in use by host
+    - Restart VM after adding USB device
+  </Accordion>
+  
+  <Accordion title="VM won't start after update">
+    - Check Proxmox logs: `journalctl -xe`
+    - Verify disk space: `pvesm status`
+    - Try starting in safe mode via console
+    - Restore from backup if necessary
+  </Accordion>
+  
+  <Accordion title="Slow performance">
+    - Increase RAM allocation (4 GB minimum)
+    - Add more CPU cores
+    - Check disk I/O performance
+    - Disable unnecessary integrations
+    - Consider SSD storage for VM disk
+  </Accordion>
+</AccordionGroup>
+
+## Updating Home Assistant
+
+Home Assistant OS automatically checks for updates:
+
+<Steps>
+  <Step title="Check for Updates">
+    Settings → System → Updates
+  </Step>
+  
+  <Step title="Review Release Notes">
+    Click on available update to read release notes
+  </Step>
+  
+  <Step title="Create Backup">
+    Always backup before updating (Settings → System → Backups)
+  </Step>
+  
+  <Step title="Install Update">
+    Click **Update** button and wait for completion
+  </Step>
+</Steps>
+
+<Note>
+Updates include:
+- Home Assistant Core
+- Home Assistant Supervisor  
+- Home Assistant OS
+- Add-ons
+</Note>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Linux VMs" icon="linux" href="/reference/vms/linux-vms">
+    Deploy Linux virtual machines
+  </Card>
+  <Card title="Network Appliances" icon="network-wired" href="/reference/vms/network-appliances">
+    Set up routers and firewalls
+  </Card>
+  <Card title="VM Overview" icon="layer-group" href="/reference/vms/overview">
+    Back to all VM scripts
+  </Card>
+</CardGroup>

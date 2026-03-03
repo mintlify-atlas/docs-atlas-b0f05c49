@@ -1,0 +1,608 @@
+---
+title: API Functions
+description: Telemetry and diagnostics API for Proxmox VE Helper Scripts
+---
+
+The `api.func` library provides functions for sending anonymous telemetry data via the community telemetry ingest service. It enables privacy-respecting analytics to improve script reliability and track common issues.
+
+## Privacy & Opt-Out
+
+<Accordion title="What Data is Collected?">
+  - **Anonymous statistics only** (no personal data, no IP addresses)
+  - Container/VM configuration (CPU, RAM, disk size, OS type)
+  - Installation success/failure status
+  - Error codes and categories (for failure analysis)
+  - PVE version, hardware info (CPU vendor, GPU vendor, RAM speed)
+  - Installation duration
+  - Random UUID for session tracking only (not linked to any user)
+</Accordion>
+
+<Accordion title="How to Opt-Out">
+  Set `DIAGNOSTICS=no` in your environment or default.vars:
+  ```bash
+  export DIAGNOSTICS=no
+  ```
+
+  Or edit `/usr/local/community-scripts/diagnostics`:
+  ```bash
+  DIAGNOSTICS=no
+  ```
+</Accordion>
+
+## Configuration
+
+### Telemetry Settings
+
+<ParamField path="TELEMETRY_URL" type="string" default="https://telemetry.community-scripts.org/telemetry">
+  Telemetry ingest endpoint
+</ParamField>
+
+<ParamField path="TELEMETRY_TIMEOUT" type="number" default="5">
+  Timeout for progress pings (seconds)
+</ParamField>
+
+<ParamField path="STATUS_TIMEOUT" type="number" default="10">
+  Timeout for final status updates (seconds)
+</ParamField>
+
+```bash api.func:35-42
+TELEMETRY_URL="https://telemetry.community-scripts.org/telemetry"
+
+# Timeout for telemetry requests (seconds)
+# Progress pings (validation/configuring) use the short timeout
+TELEMETRY_TIMEOUT=5
+# Final status updates (success/failed) use the longer timeout
+# PocketBase may need more time under load (FindRecord + UpdateRecord)
+STATUS_TIMEOUT=10
+```
+
+## Core Telemetry Functions
+
+### post_to_api()
+
+Sends LXC container creation statistics to telemetry service.
+
+<ParamField path="DIAGNOSTICS" type="string" required>
+  Telemetry opt-in: `yes` or `no`
+</ParamField>
+
+<ParamField path="RANDOM_UUID" type="string" required>
+  Unique session UUID for tracking
+</ParamField>
+
+```bash api.func:610-711
+post_to_api() {
+  # Prevent duplicate submissions
+  [[ "${POST_TO_API_DONE:-}" == "true" ]] && return 0
+
+  # Silent fail - telemetry should never break scripts
+  command -v curl &>/dev/null || return 0
+  [[ "${DIAGNOSTICS:-no}" == "no" ]] && return 0
+  [[ -z "${RANDOM_UUID:-}" ]] && return 0
+
+  # Set type for later status updates
+  TELEMETRY_TYPE="lxc"
+
+  local pve_version=""
+  if command -v pveversion &>/dev/null; then
+    pve_version=$(pveversion 2>/dev/null | awk -F'[/ ]' '{print $2}') || true
+  fi
+
+  # Detect GPU, CPU, RAM
+  [[ -z "${GPU_VENDOR:-}" ]] && detect_gpu
+  [[ -z "${CPU_VENDOR:-}" ]] && detect_cpu
+  [[ -z "${RAM_SPEED:-}" ]] && detect_ram
+
+  local JSON_PAYLOAD
+  JSON_PAYLOAD=$(cat <<EOF
+{
+    "random_id": "${RANDOM_UUID}",
+    "execution_id": "${EXECUTION_ID:-${RANDOM_UUID}}",
+    "type": "lxc",
+    "nsapp": "${NSAPP:-unknown}",
+    "status": "installing",
+    "ct_type": ${CT_TYPE:-1},
+    "disk_size": ${DISK_SIZE:-0},
+    "core_count": ${CORE_COUNT:-0},
+    "ram_size": ${RAM_SIZE:-0},
+    "os_type": "${var_os:-}",
+    "os_version": "${var_version:-}",
+    "pve_version": "${pve_version}",
+    "method": "${METHOD:-default}",
+    "cpu_vendor": "${CPU_VENDOR:-unknown}",
+    "cpu_model": "${CPU_MODEL:-}",
+    "gpu_vendor": "${GPU_VENDOR:-unknown}",
+    "gpu_model": "${GPU_MODEL:-}",
+    "gpu_passthrough": "${GPU_PASSTHROUGH:-unknown}",
+    "ram_speed": "${RAM_SPEED:-}",
+    "repo_source": "${REPO_SOURCE}"
+}
+EOF
+)
+
+  # Send initial "installing" record with retry
+  local http_code="" attempt
+  for attempt in 1 2 3; do
+    http_code=$(curl -sS -w "%{http_code}" -m "${TELEMETRY_TIMEOUT}" -X POST "${TELEMETRY_URL}" \
+      -H "Content-Type: application/json" \
+      -d "$JSON_PAYLOAD" -o /dev/null 2>/dev/null) || http_code="000"
+    [[ "$http_code" =~ ^2[0-9]{2}$ ]] && break
+    [[ "$attempt" -lt 3 ]] && sleep 1
+  done
+
+  POST_TO_API_DONE=true
+}
+```
+
+### post_update_to_api()
+
+Reports installation completion status to telemetry service.
+
+<ParamField path="status" type="string" required>
+  Installation status: `done` or `failed`
+</ParamField>
+
+<ParamField path="exit_code" type="number" default="1">
+  Exit code (0 for success, non-zero for failure)
+</ParamField>
+
+```bash api.func:854-1072
+post_update_to_api() {
+  command -v curl &>/dev/null || return 0
+
+  # Prevent duplicate submissions
+  local force="${3:-}"
+  POST_UPDATE_DONE=${POST_UPDATE_DONE:-false}
+  if [[ "$POST_UPDATE_DONE" == "true" && "$force" != "force" ]]; then
+    return 0
+  fi
+
+  [[ "${DIAGNOSTICS:-no}" == "no" ]] && return 0
+  [[ -z "${RANDOM_UUID:-}" ]] && return 0
+
+  local status="${1:-failed}"
+  local raw_exit_code="${2:-1}"
+  local exit_code=0 error="" pb_status error_category=""
+
+  # Map status to telemetry values
+  case "$status" in
+  done | success)
+    pb_status="success"
+    exit_code=0
+    error=""
+    error_category=""
+    ;;
+  failed)
+    pb_status="failed"
+    ;;
+  *)
+    pb_status="unknown"
+    ;;
+  esac
+
+  # For failed status, resolve exit code and error description
+  if [[ "$pb_status" == "failed" ]] || [[ "$pb_status" == "unknown" ]]; then
+    if [[ "$raw_exit_code" =~ ^[0-9]+$ ]]; then
+      exit_code="$raw_exit_code"
+    else
+      exit_code=1
+    fi
+    # Get full installation log for error field
+    local log_text=""
+    log_text=$(get_full_log 122880) || true # 120KB max
+    if [[ -z "$log_text" ]]; then
+      log_text=$(get_error_text)
+    fi
+    local full_error
+    full_error=$(build_error_string "$exit_code" "$log_text")
+    error=$(json_escape "$full_error")
+    error_category=$(categorize_error "$exit_code")
+    [[ -z "$error" ]] && error="Unknown error"
+  fi
+
+  # Calculate duration if timer was started
+  local duration=0
+  if [[ -n "${INSTALL_START_TIME:-}" ]]; then
+    duration=$(($(date +%s) - INSTALL_START_TIME))
+  fi
+
+  # 3-tier retry strategy:
+  # 1. Full payload with complete error text (120KB log)
+  # 2. Medium payload with truncated log (16KB)
+  # 3. Minimal payload with error description only
+
+  # Attempt 1: Full payload
+  local JSON_PAYLOAD
+  JSON_PAYLOAD=$(cat <<EOF
+{
+    "random_id": "${RANDOM_UUID}",
+    "execution_id": "${EXECUTION_ID:-${RANDOM_UUID}}",
+    "type": "${TELEMETRY_TYPE:-lxc}",
+    "nsapp": "${NSAPP:-unknown}",
+    "status": "${pb_status}",
+    "ct_type": ${CT_TYPE:-1},
+    "disk_size": ${DISK_SIZE_API},
+    "core_count": ${CORE_COUNT:-0},
+    "ram_size": ${RAM_SIZE:-0},
+    "os_type": "${var_os:-}",
+    "os_version": "${var_version:-}",
+    "pve_version": "${pve_version}",
+    "method": "${METHOD:-default}",
+    "exit_code": ${exit_code},
+    "error": "${error}",
+    "error_category": "${error_category}",
+    "install_duration": ${duration},
+    "cpu_vendor": "${CPU_VENDOR:-unknown}",
+    "gpu_vendor": "${GPU_VENDOR:-unknown}",
+    "repo_source": "${REPO_SOURCE}"
+}
+EOF
+)
+
+  http_code=$(curl -sS -w "%{http_code}" -m "${STATUS_TIMEOUT}" -X POST "${TELEMETRY_URL}" \
+    -H "Content-Type: application/json" \
+    -d "$JSON_PAYLOAD" -o /dev/null 2>/dev/null) || http_code="000"
+
+  if [[ "$http_code" =~ ^2[0-9]{2}$ ]]; then
+    POST_UPDATE_DONE=true
+    return 0
+  fi
+
+  # Attempt 2: Medium payload with truncated log
+  # (retry logic continues...)
+  POST_UPDATE_DONE=true
+}
+```
+
+### post_progress_to_api()
+
+Lightweight progress ping from host or container.
+
+<ParamField path="status" type="string" default="configuring">
+  Progress status: `validation`, `configuring`, or custom
+</ParamField>
+
+```bash api.func:825-837
+post_progress_to_api() {
+  command -v curl &>/dev/null || return 0
+  [[ "${DIAGNOSTICS:-no}" == "no" ]] && return 0
+  [[ -z "${RANDOM_UUID:-}" ]] && return 0
+
+  local progress_status="${1:-configuring}"
+  local app_name="${NSAPP:-${app:-unknown}}"
+  local telemetry_type="${TELEMETRY_TYPE:-lxc}"
+
+  curl -fsS -m 5 -X POST "${TELEMETRY_URL:-https://telemetry.community-scripts.org/telemetry}" \
+    -H "Content-Type: application/json" \
+    -d "{\"random_id\":\"${RANDOM_UUID}\",\"execution_id\":\"${EXECUTION_ID:-${RANDOM_UUID}}\",\"type\":\"${telemetry_type}\",\"nsapp\":\"${app_name}\",\"status\":\"${progress_status}\"}" &>/dev/null || true
+}
+```
+
+## Hardware Detection
+
+### detect_gpu()
+
+Detects GPU vendor, model, and passthrough type.
+
+<ParamField path="GPU_VENDOR" type="string">
+  GPU vendor: `intel`, `amd`, `nvidia`, or `unknown`
+</ParamField>
+
+<ParamField path="GPU_MODEL" type="string">
+  GPU model name (max 64 characters)
+</ParamField>
+
+<ParamField path="GPU_PASSTHROUGH" type="string">
+  Passthrough type: `igpu`, `dgpu`, or `unknown`
+</ParamField>
+
+```bash api.func:501-531
+detect_gpu() {
+  GPU_VENDOR="unknown"
+  GPU_MODEL=""
+  GPU_PASSTHROUGH="unknown"
+
+  local gpu_line
+  gpu_line=$(lspci 2>/dev/null | grep -iE "VGA|3D|Display" | head -1)
+
+  if [[ -n "$gpu_line" ]]; then
+    # Extract model: everything after the colon
+    GPU_MODEL=$(echo "$gpu_line" | sed 's/.*: //' | sed 's/ (rev .*)$//' | cut -c1-64)
+
+    # Detect vendor and passthrough type
+    if echo "$gpu_line" | grep -qi "Intel"; then
+      GPU_VENDOR="intel"
+      GPU_PASSTHROUGH="igpu"
+    elif echo "$gpu_line" | grep -qi "AMD|ATI"; then
+      GPU_VENDOR="amd"
+      if echo "$gpu_line" | grep -qi "Radeon RX|Radeon Pro"; then
+        GPU_PASSTHROUGH="dgpu"
+      else
+        GPU_PASSTHROUGH="igpu"
+      fi
+    elif echo "$gpu_line" | grep -qi "NVIDIA"; then
+      GPU_VENDOR="nvidia"
+      GPU_PASSTHROUGH="dgpu"
+    fi
+  fi
+
+  export GPU_VENDOR GPU_MODEL GPU_PASSTHROUGH
+}
+```
+
+### detect_cpu()
+
+Detects CPU vendor and model.
+
+<ParamField path="CPU_VENDOR" type="string">
+  CPU vendor: `intel`, `amd`, `arm`, or `unknown`
+</ParamField>
+
+<ParamField path="CPU_MODEL" type="string">
+  CPU model name (max 64 characters)
+</ParamField>
+
+```bash api.func:540-564
+detect_cpu() {
+  CPU_VENDOR="unknown"
+  CPU_MODEL=""
+
+  if [[ -f /proc/cpuinfo ]]; then
+    local vendor_id
+    vendor_id=$(grep -m1 "vendor_id" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | tr -d ' ')
+
+    case "$vendor_id" in
+    GenuineIntel) CPU_VENDOR="intel" ;;
+    AuthenticAMD) CPU_VENDOR="amd" ;;
+    *)
+      # ARM doesn't have vendor_id, check for CPU implementer
+      if grep -qi "CPU implementer" /proc/cpuinfo 2>/dev/null; then
+        CPU_VENDOR="arm"
+      fi
+      ;;
+    esac
+
+    # Extract model name and clean it up
+    CPU_MODEL=$(grep -m1 "model name" /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ *//' | sed 's/(R)//g' | sed 's/(TM)//g' | sed 's/  */ /g' | cut -c1-64)
+  fi
+
+  export CPU_VENDOR CPU_MODEL
+}
+```
+
+### detect_ram()
+
+Detects RAM speed using dmidecode.
+
+<ParamField path="RAM_SPEED" type="string">
+  RAM speed in MHz (e.g., `4800` for DDR5-4800)
+</ParamField>
+
+```bash api.func:574-589
+detect_ram() {
+  RAM_SPEED=""
+
+  if command -v dmidecode &>/dev/null; then
+    # Get configured memory speed (actual running speed)
+    RAM_SPEED=$(dmidecode -t memory 2>/dev/null | grep -m1 "Configured Memory Speed:" | grep -oE "[0-9]+" | head -1) || true
+
+    # Fallback to Speed: if Configured not available
+    if [[ -z "$RAM_SPEED" ]]; then
+      RAM_SPEED=$(dmidecode -t memory 2>/dev/null | grep -m1 "Speed:" | grep -oE "[0-9]+" | head -1) || true
+    fi
+  fi
+
+  export RAM_SPEED
+}
+```
+
+## Error Handling
+
+### explain_exit_code()
+
+Maps numeric exit codes to human-readable error descriptions.
+
+<ParamField path="code" type="number" required>
+  Exit code to explain
+</ParamField>
+
+<Expandable title="Supported Error Categories">
+  - **Generic/Shell** (1-3, 10, 124-146)
+  - **curl/wget errors** (4-8, 16-95)
+  - **Package manager errors** (100-102, 255)
+  - **Script validation** (103-123)
+  - **BSD sysexits** (64-78)
+  - **Systemd/Service errors** (150-154)
+  - **Python/pip/uv errors** (160-162)
+  - **Database errors** (170-193)
+  - **Proxmox custom codes** (200-231)
+  - **Tools & addons** (232-238)
+  - **Node.js/npm errors** (239-249)
+  - **Application errors** (250-254)
+</Expandable>
+
+```bash api.func:140-338
+explain_exit_code() {
+  local code="$1"
+  case "$code" in
+  # Generic / Shell
+  1) echo "General error / Operation not permitted" ;;
+  2) echo "Misuse of shell builtins (e.g. syntax error)" ;;
+  3) echo "General syntax or argument error" ;;
+  
+  # curl / wget errors
+  6) echo "curl: DNS resolution failed (could not resolve host)" ;;
+  7) echo "curl: Failed to connect (network unreachable / host down)" ;;
+  22) echo "curl: HTTP error returned (404, 429, 500+)" ;;
+  28) echo "curl: Operation timeout (network slow or server not responding)" ;;
+  
+  # Package manager / APT / DPKG
+  100) echo "APT: Package manager error (broken packages / dependency problems)" ;;
+  101) echo "APT: Configuration error (bad sources.list, malformed config)" ;;
+  102) echo "APT: Lock held by another process (dpkg/apt still running)" ;;
+  
+  # Proxmox errors
+  121) echo "LXC: Container network not ready (no IP after retries)" ;;
+  122) echo "LXC: No internet connectivity — user declined to continue" ;;
+  
+  # Default
+  *) echo "Unknown error" ;;
+  esac
+}
+```
+
+### categorize_error()
+
+Maps exit codes to error categories for analytics.
+
+<ParamField path="code" type="number" required>
+  Exit code to categorize
+</ParamField>
+
+<ParamField path="return" type="string">
+  Error category: `network`, `storage`, `dependency`, `permission`, `timeout`, `config`, `resource`, `unknown`
+</ParamField>
+
+```bash api.func:1085-1139
+categorize_error() {
+  local code="$1"
+  case "$code" in
+  # Network errors
+  6 | 7 | 22 | 35) echo "network" ;;
+  
+  # Timeout errors
+  28 | 124 | 211) echo "timeout" ;;
+  
+  # Storage errors
+  214 | 217 | 219 | 224) echo "storage" ;;
+  
+  # Dependency/Package errors
+  100 | 101 | 102 | 127 | 160 | 161 | 162 | 255) echo "dependency" ;;
+  
+  # Permission errors
+  126 | 152) echo "permission" ;;
+  
+  # Resource errors (OOM, SIGKILL)
+  134 | 137) echo "resource" ;;
+  
+  # Default
+  *) echo "unknown" ;;
+  esac
+}
+```
+
+## Tool Telemetry
+
+### init_tool_telemetry()
+
+One-line telemetry setup for tools/addon scripts.
+
+<ParamField path="tool_name" type="string">
+  Tool name (optional, falls back to $APP at exit time)
+</ParamField>
+
+<ParamField path="type" type="string" default="pve">
+  Tool type: `pve` for PVE host scripts, `addon` for container addons
+</ParamField>
+
+```bash api.func:1207-1223
+init_tool_telemetry() {
+  local name="${1:-}"
+  local type="${2:-pve}"
+
+  [[ -n "$name" ]] && TELEMETRY_TOOL_NAME="$name"
+  TELEMETRY_TOOL_TYPE="$type"
+
+  # Read diagnostics opt-in/opt-out
+  if [[ -f /usr/local/community-scripts/diagnostics ]]; then
+    DIAGNOSTICS=$(grep -i "^DIAGNOSTICS=" /usr/local/community-scripts/diagnostics 2>/dev/null | awk -F'=' '{print $2}') || true
+  fi
+
+  start_install_timer
+
+  # EXIT trap: automatically report telemetry when script ends
+  trap '_telemetry_report_exit "$?"' EXIT
+}
+```
+
+## Usage Examples
+
+<CodeGroup>
+```bash LXC Container Creation
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/api.func)
+
+# Start installation
+post_to_api
+
+# Report progress
+post_progress_to_api "configuring"
+
+# Report success
+post_update_to_api "done" 0
+
+# Or report failure
+post_update_to_api "failed" 100
+```
+
+```bash PVE Tool Script
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/api.func) 2>/dev/null || true
+
+# Initialize telemetry (auto-reports on exit)
+init_tool_telemetry "post-pve-install" "pve"
+
+# Your script logic here
+# Telemetry will be automatically reported on exit
+```
+
+```bash Container Addon Script
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/api.func) 2>/dev/null || true
+
+# Initialize telemetry for addon
+init_tool_telemetry "filebrowser" "addon"
+
+# Your addon installation logic
+# Telemetry will be automatically reported on exit
+```
+
+```bash Hardware Detection
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/api.func)
+
+# Detect hardware
+detect_cpu
+detect_gpu
+detect_ram
+
+echo "CPU: $CPU_VENDOR $CPU_MODEL"
+echo "GPU: $GPU_VENDOR $GPU_MODEL ($GPU_PASSTHROUGH)"
+echo "RAM: ${RAM_SPEED}MHz"
+```
+</CodeGroup>
+
+## Data Retention
+
+<Accordion title="How Long is Data Stored?">
+  Telemetry data is retained for **30 days** for analytics purposes, then automatically deleted. This allows us to:
+  - Identify trending issues quickly
+  - Track success rates over time
+  - Improve script reliability
+
+  No data is sold or shared with third parties.
+</Accordion>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Build Functions" icon="hammer" href="./build">
+    LXC container build and configuration
+  </Card>
+  <Card title="Install Functions" icon="download" href="./install">
+    Container installation and setup
+  </Card>
+  <Card title="Tools Functions" icon="wrench" href="./tools">
+    Package management and system utilities
+  </Card>
+</CardGroup>

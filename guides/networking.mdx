@@ -1,0 +1,623 @@
+---
+title: Networking Configuration
+description: Complete guide to networking configuration for Proxmox VE containers and virtual machines
+---
+
+Proper network configuration is essential for containers and VMs. This guide covers everything from basic networking to advanced configurations.
+
+## Network Basics
+
+### Network Bridges
+
+Proxmox uses **Linux bridges** to connect VMs and containers to networks.
+
+<CardGroup cols={2}>
+  <Card title="vmbr0" icon="bridge" color="#00617F">
+    **Default Bridge**
+    - Created during Proxmox installation
+    - Connected to physical network interface
+    - Used by most containers/VMs
+  </Card>
+  
+  <Card title="Custom Bridges" icon="diagram-project">
+    **Additional Bridges**
+    - Isolated networks
+    - VLAN separation
+    - Internal-only communication
+  </Card>
+</CardGroup>
+
+### Viewing Network Configuration
+
+<Tabs>
+  <Tab title="Web UI">
+    1. Select Proxmox node
+    2. Navigate to **System** → **Network**
+    3. View bridges, interfaces, and bonds
+  </Tab>
+  
+  <Tab title="Command Line">
+    ```bash
+    # View all network interfaces
+    ip addr show
+    
+    # View bridges
+    brctl show
+    
+    # View routing table
+    ip route
+    ```
+  </Tab>
+</Tabs>
+
+## Container Networking
+
+### Static IP Configuration
+
+<Steps>
+  <Step title="During Container Creation">
+    When running a script, you can specify network settings:
+    - Choose **Advanced Settings**
+    - Configure static IP or DHCP
+    - Set gateway and DNS servers
+  </Step>
+  
+  <Step title="After Container Creation (Web UI)">
+    1. Select the container
+    2. Navigate to **Network**
+    3. Edit `net0`
+    4. Set:
+       - IPv4: `192.168.1.100/24`
+       - Gateway: `192.168.1.1`
+  </Step>
+  
+  <Step title="After Container Creation (CLI)">
+    ```bash
+    # Set static IP
+    pct set <CTID> -net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,gw=192.168.1.1
+    
+    # Restart container
+    pct reboot <CTID>
+    ```
+  </Step>
+</Steps>
+
+### DHCP Configuration
+
+<Tabs>
+  <Tab title="Web UI">
+    1. Container → **Network**
+    2. Edit `net0`
+    3. IPv4: Set to **DHCP**
+  </Tab>
+  
+  <Tab title="CLI">
+    ```bash
+    pct set <CTID> -net0 name=eth0,bridge=vmbr0,ip=dhcp
+    ```
+  </Tab>
+</Tabs>
+
+### DNS Configuration
+
+Set DNS servers for containers:
+
+```bash
+# Edit resolv.conf inside container
+pct enter <CTID>
+
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+```
+
+<Tip>
+For permanent DNS settings in Debian/Ubuntu containers, edit `/etc/network/interfaces` or use `/etc/systemd/resolved.conf`.
+</Tip>
+
+## VM Networking
+
+### Network Interface Types
+
+<CardGroup cols={3}>
+  <Card title="VirtIO" icon="bolt" color="#00a8e1">
+    **Best Performance**
+    - Paravirtualized driver
+    - Low CPU overhead
+    - Recommended for Linux
+  </Card>
+  
+  <Card title="Intel E1000" icon="microchip">
+    **Compatibility**
+    - Emulated hardware
+    - Broader OS support
+    - Higher CPU usage
+  </Card>
+  
+  <Card title="VMware vmxnet3" icon="network-wired">
+    **VMware Import**
+    - For migrated VMs
+    - Good performance
+  </Card>
+</CardGroup>
+
+### Configure VM Network
+
+<Steps>
+  <Step title="Set Network Device (CLI)">
+    ```bash
+    # VirtIO network device
+    qm set <VMID> -net0 virtio,bridge=vmbr0
+    
+    # With static MAC address
+    qm set <VMID> -net0 virtio,bridge=vmbr0,macaddr=02:00:00:00:00:01
+    ```
+  </Step>
+  
+  <Step title="Configure Inside VM">
+    After VM boots, configure networking:
+    
+    **Debian/Ubuntu:**
+    ```bash
+    # Edit /etc/network/interfaces
+    auto eth0
+    iface eth0 inet static
+        address 192.168.1.100
+        netmask 255.255.255.0
+        gateway 192.168.1.1
+        dns-nameservers 8.8.8.8 1.1.1.1
+    ```
+    
+    **Using netplan (Ubuntu 18.04+):**
+    ```yaml
+    # /etc/netplan/01-netcfg.yaml
+    network:
+      version: 2
+      ethernets:
+        eth0:
+          addresses:
+            - 192.168.1.100/24
+          gateway4: 192.168.1.1
+          nameservers:
+            addresses: [8.8.8.8, 1.1.1.1]
+    ```
+    
+    Apply:
+    ```bash
+    netplan apply
+    ```
+  </Step>
+</Steps>
+
+## VLANs
+
+VLANs provide network segmentation for security and organization.
+
+### VLAN-Aware Bridge
+
+<Steps>
+  <Step title="Enable VLAN Awareness">
+    Edit `/etc/network/interfaces`:
+    ```bash
+    auto vmbr0
+    iface vmbr0 inet static
+        address 192.168.1.10/24
+        gateway 192.168.1.1
+        bridge-ports eno1
+        bridge-stp off
+        bridge-fd 0
+        bridge-vlan-aware yes
+        bridge-vids 2-4094
+    ```
+  </Step>
+  
+  <Step title="Apply Changes">
+    ```bash
+    ifreload -a
+    ```
+  </Step>
+</Steps>
+
+### Assign VLAN to Container
+
+<Tabs>
+  <Tab title="Web UI">
+    1. Container → **Network**
+    2. Edit `net0`
+    3. Set **VLAN Tag** (e.g., 10)
+  </Tab>
+  
+  <Tab title="CLI">
+    ```bash
+    pct set <CTID> -net0 name=eth0,bridge=vmbr0,tag=10,ip=192.168.10.100/24,gw=192.168.10.1
+    ```
+  </Tab>
+</Tabs>
+
+### Assign VLAN to VM
+
+```bash
+qm set <VMID> -net0 virtio,bridge=vmbr0,tag=10
+```
+
+### Common VLAN Use Cases
+
+<CardGroup cols={2}>
+  <Card title="IoT Devices" icon="lightbulb">
+    **VLAN 10**
+    - Home Assistant
+    - Smart home devices
+    - Isolated from main network
+  </Card>
+  
+  <Card title="Guest Network" icon="wifi">
+    **VLAN 20**
+    - Guest Wi-Fi
+    - Limited access
+    - Internet only
+  </Card>
+  
+  <Card title="Management" icon="screwdriver-wrench">
+    **VLAN 99**
+    - Proxmox host
+    - Network switches
+    - Administrative access
+  </Card>
+  
+  <Card title="Servers" icon="server">
+    **VLAN 30**
+    - Web servers
+    - Databases
+    - Production services
+  </Card>
+</CardGroup>
+
+## Firewall Configuration
+
+### Enable Proxmox Firewall
+
+<Steps>
+  <Step title="Enable Datacenter Firewall">
+    1. Navigate to **Datacenter** → **Firewall**
+    2. Check **Enable Firewall**
+  </Step>
+  
+  <Step title="Enable Node Firewall">
+    1. Select node → **Firewall** → **Options**
+    2. Enable firewall for the node
+  </Step>
+  
+  <Step title="Enable Container/VM Firewall">
+    1. Select container/VM → **Firewall** → **Options**
+    2. Enable firewall
+  </Step>
+</Steps>
+
+<Warning>
+Firewall rules are evaluated at three levels: Datacenter → Node → Container/VM. Ensure all levels are configured correctly.
+</Warning>
+
+### Create Firewall Rules
+
+<Tabs>
+  <Tab title="Web UI">
+    1. Container/VM → **Firewall** → **Add**
+    2. Configure:
+       - Direction: IN/OUT
+       - Action: ACCEPT/REJECT/DROP
+       - Protocol: TCP/UDP/ICMP
+       - Source/Destination
+       - Port
+  </Tab>
+  
+  <Tab title="CLI">
+    Edit `/etc/pve/firewall/<CTID>.fw`:
+    ```bash
+    [RULES]
+    IN ACCEPT -p tcp -dport 22 -source 192.168.1.0/24
+    IN ACCEPT -p tcp -dport 80
+    IN ACCEPT -p tcp -dport 443
+    IN DROP
+    ```
+  </Tab>
+</Tabs>
+
+### Common Firewall Rules
+
+<AccordionGroup>
+  <Accordion title="Allow SSH from Local Network">
+    ```
+    Direction: IN
+    Action: ACCEPT
+    Protocol: tcp
+    Dest. port: 22
+    Source: 192.168.1.0/24
+    ```
+  </Accordion>
+  
+  <Accordion title="Allow HTTP/HTTPS">
+    ```
+    Direction: IN
+    Action: ACCEPT
+    Protocol: tcp
+    Dest. port: 80,443
+    ```
+  </Accordion>
+  
+  <Accordion title="Block All Other Traffic">
+    ```
+    Direction: IN
+    Action: DROP
+    Protocol: any
+    ```
+  </Accordion>
+  
+  <Accordion title="Allow Outbound Traffic">
+    ```
+    Direction: OUT
+    Action: ACCEPT
+    Protocol: any
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Networking
+
+### Multiple Network Interfaces
+
+Add additional network interfaces:
+
+<Tabs>
+  <Tab title="Container">
+    ```bash
+    # Add second network interface
+    pct set <CTID> -net1 name=eth1,bridge=vmbr1,ip=192.168.2.100/24
+    ```
+  </Tab>
+  
+  <Tab title="VM">
+    ```bash
+    # Add second network interface
+    qm set <VMID> -net1 virtio,bridge=vmbr1
+    ```
+  </Tab>
+</Tabs>
+
+### Network Bonding
+
+Combine multiple network interfaces for redundancy or bandwidth:
+
+```bash
+# Edit /etc/network/interfaces
+auto bond0
+iface bond0 inet manual
+    bond-slaves eno1 eno2
+    bond-miimon 100
+    bond-mode 802.3ad
+    bond-xmit-hash-policy layer2+3
+
+auto vmbr0
+iface vmbr0 inet static
+    address 192.168.1.10/24
+    gateway 192.168.1.1
+    bridge-ports bond0
+    bridge-stp off
+    bridge-fd 0
+```
+
+**Bond Modes:**
+- **balance-rr (0)** - Round-robin
+- **active-backup (1)** - Failover
+- **balance-xor (2)** - XOR based
+- **802.3ad (4)** - LACP (requires switch support)
+
+### Internal-Only Network
+
+Create isolated network for container communication:
+
+<Steps>
+  <Step title="Create Bridge">
+    Edit `/etc/network/interfaces`:
+    ```bash
+    auto vmbr1
+    iface vmbr1 inet static
+        address 10.0.0.1/24
+        bridge-ports none
+        bridge-stp off
+        bridge-fd 0
+    ```
+  </Step>
+  
+  <Step title="Apply Configuration">
+    ```bash
+    ifreload -a
+    ```
+  </Step>
+  
+  <Step title="Assign to Containers">
+    ```bash
+    pct set <CTID> -net1 name=eth1,bridge=vmbr1,ip=10.0.0.10/24
+    ```
+  </Step>
+</Steps>
+
+### NAT and Port Forwarding
+
+Forward external ports to containers:
+
+<Steps>
+  <Step title="Enable IP Forwarding">
+    ```bash
+    echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+    sysctl -p
+    ```
+  </Step>
+  
+  <Step title="Add iptables Rules">
+    ```bash
+    # Forward port 8080 to container on port 80
+    iptables -t nat -A PREROUTING -i vmbr0 -p tcp --dport 8080 -j DNAT --to 192.168.1.100:80
+    iptables -t nat -A POSTROUTING -s 192.168.1.0/24 -o vmbr0 -j MASQUERADE
+    ```
+  </Step>
+  
+  <Step title="Make Rules Persistent">
+    ```bash
+    apt install iptables-persistent
+    netfilter-persistent save
+    ```
+  </Step>
+</Steps>
+
+## IPv6 Configuration
+
+### Enable IPv6
+
+<Steps>
+  <Step title="Configure Bridge">
+    Edit `/etc/network/interfaces`:
+    ```bash
+    iface vmbr0 inet6 static
+        address 2001:db8::1/64
+    ```
+  </Step>
+  
+  <Step title="Assign to Container">
+    ```bash
+    pct set <CTID> -net0 name=eth0,bridge=vmbr0,ip=192.168.1.100/24,ip6=2001:db8::100/64,gw6=2001:db8::1
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Container/VM has no network">
+    **Check:**
+    1. Bridge configuration: `brctl show`
+    2. Container network config: `pct config <CTID>`
+    3. IP address: `pct enter <CTID>` then `ip addr`
+    4. Restart network: `systemctl restart networking`
+  </Accordion>
+  
+  <Accordion title="Cannot ping gateway">
+    **Verify:**
+    ```bash
+    # Check routing table
+    ip route
+    
+    # Check ARP table
+    ip neigh
+    
+    # Test from host
+    ping -c 4 192.168.1.1
+    ```
+  </Accordion>
+  
+  <Accordion title="DNS not resolving">
+    **Fix DNS:**
+    ```bash
+    # Inside container
+    echo "nameserver 8.8.8.8" > /etc/resolv.conf
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+    
+    # Test resolution
+    nslookup google.com
+    ```
+  </Accordion>
+  
+  <Accordion title="VLAN traffic not working">
+    **Checklist:**
+    1. Bridge is VLAN-aware
+    2. Switch port is configured as trunk
+    3. VLAN exists on switch
+    4. Correct VLAN tag on container/VM
+  </Accordion>
+</AccordionGroup>
+
+## Network Monitoring
+
+### Monitor Traffic
+
+<Tabs>
+  <Tab title="iftop">
+    ```bash
+    apt install iftop
+    iftop -i vmbr0
+    ```
+  </Tab>
+  
+  <Tab title="nload">
+    ```bash
+    apt install nload
+    nload vmbr0
+    ```
+  </Tab>
+  
+  <Tab title="vnstat">
+    ```bash
+    apt install vnstat
+    vnstat -i vmbr0 -l
+    ```
+  </Tab>
+</Tabs>
+
+### Test Network Performance
+
+```bash
+# Install iperf3
+apt install iperf3
+
+# Server (on one container)
+iperf3 -s
+
+# Client (on another)
+iperf3 -c <server-ip>
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Plan IP Addressing" icon="sitemap">
+    - Use consistent IP scheme
+    - Document assignments
+    - Reserve ranges for DHCP
+    - Use static for servers
+  </Card>
+  
+  <Card title="Use VLANs" icon="layer-group">
+    - Segment networks
+    - Isolate IoT devices
+    - Separate management
+    - Improve security
+  </Card>
+  
+  <Card title="Enable Firewall" icon="shield">
+    - Default deny incoming
+    - Allow only needed ports
+    - Log dropped packets
+    - Regular rule review
+  </Card>
+  
+  <Card title="Monitor Traffic" icon="chart-line">
+    - Track bandwidth usage
+    - Identify bottlenecks
+    - Detect anomalies
+    - Plan upgrades
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Security Hardening" icon="shield-halved" href="/guides/security-hardening">
+    Secure your network configuration
+  </Card>
+  
+  <Card title="Popular Apps" icon="star" href="/guides/popular-apps">
+    Deploy network-based applications
+  </Card>
+  
+  <Card title="Docker Setup" icon="docker" href="/guides/docker-setup">
+    Configure Docker networking
+  </Card>
+</CardGroup>

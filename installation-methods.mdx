@@ -1,0 +1,557 @@
+---
+title: Installation Methods
+description: Learn all the ways to install and run Proxmox VE Helper Scripts - from web commands to local UI
+---
+
+# Installation Methods
+
+Proxmox VE Helper Scripts can be run in multiple ways to suit your workflow. This guide covers all available methods, from simple one-command installations to a local web interface.
+
+## Method 1: Direct Bash Commands (Recommended)
+
+The most straightforward method - run scripts directly from GitHub using bash and curl.
+
+### How It Works
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/SCRIPT_NAME.sh)"
+```
+
+<Steps>
+  <Step title="Download the Script">
+    `curl -fsSL` downloads the script from the GitHub repository:
+    - `-f`: Fail silently on server errors
+    - `-s`: Silent mode (no progress bar)
+    - `-S`: Show errors if they occur
+    - `-L`: Follow redirects
+  </Step>
+  
+  <Step title="Execute with Bash">
+    `bash -c "$(...)"` executes the downloaded script immediately using bash
+  </Step>
+  
+  <Step title="Script Sources build.func">
+    The script sources the `build.func` framework which handles container creation
+  </Step>
+  
+  <Step title="Installation Begins">
+    You're prompted for configuration, then the container is created and the app installed
+  </Step>
+</Steps>
+
+### Examples
+
+<CodeGroup>
+```bash Docker
+# Install Docker with Portainer option
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)"
+```
+
+```bash AdGuard Home
+# Install AdGuard Home for network-wide ad blocking
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/adguard.sh)"
+```
+
+```bash Home Assistant
+# Install Home Assistant home automation platform
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/homeassistant.sh)"
+```
+
+```bash Nginx Proxy Manager
+# Install Nginx Proxy Manager for reverse proxy management
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/nginx-proxy-manager.sh)"
+```
+</CodeGroup>
+
+### Advantages
+
+<CardGroup cols={2}>
+  <Card title="Always Up-to-Date" icon="arrows-rotate">
+    Downloads the latest version directly from GitHub every time
+  </Card>
+  <Card title="No Local Installation" icon="cloud">
+    Nothing to install - works immediately on any Proxmox host
+  </Card>
+  <Card title="Easy to Share" icon="share">
+    Copy and paste commands in documentation and support channels
+  </Card>
+  <Card title="Transparent" icon="eye">
+    You can review the script on GitHub before running it
+  </Card>
+</CardGroup>
+
+### Where to Find Commands
+
+Visit **[helper-scripts.com](https://helper-scripts.com)** to:
+
+1. Browse all available scripts by category
+2. Search for specific applications
+3. Copy the exact bash command for each script
+4. View script details, requirements, and notes
+
+<Tip>
+  The website provides a searchable interface with categories like "Media", "Networking", "Home Automation", "Development", etc.
+</Tip>
+
+## Method 2: PVEScripts-Local (Web UI)
+
+Install a web-based script manager directly in your Proxmox environment for convenient access without visiting external websites.
+
+### What is PVEScripts-Local?
+
+PVEScripts-Local is a **containerized web application** that provides:
+
+- A searchable catalog of all available scripts
+- One-click script execution
+- Script descriptions and documentation
+- Local hosting (no external dependencies after installation)
+- Easy updates to script catalog
+
+### Installation
+
+Install PVEScripts-Local using this command:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/pve-scripts-local.sh)"
+```
+
+<Steps>
+  <Step title="Run Installation Command">
+    Paste the command in your Proxmox shell and press Enter
+  </Step>
+  
+  <Step title="Configure Container">
+    Accept defaults or customize:
+    - Container ID: Next available (e.g., 100)
+    - Hostname: pve-scripts-local
+    - Disk: 4 GB
+    - CPU: 2 cores
+    - RAM: 4096 MB
+  </Step>
+  
+  <Step title="Wait for Installation">
+    The script will create the container and install the web application (2-3 minutes)
+  </Step>
+  
+  <Step title="Access the Web UI">
+    Open your browser to the provided URL:
+    ```
+    http://YOUR_CONTAINER_IP:3000
+    ```
+  </Step>
+</Steps>
+
+### Using PVEScripts-Local
+
+Once installed:
+
+<Steps>
+  <Step title="Browse Scripts">
+    Navigate the web interface to find scripts by:
+    - Category (Media, Networking, etc.)
+    - Search bar
+    - Popular/recent scripts
+  </Step>
+  
+  <Step title="View Script Details">
+    Click on any script to see:
+    - Description
+    - Default resources (CPU, RAM, disk)
+    - Installation notes
+    - Update availability
+  </Step>
+  
+  <Step title="Copy Installation Command">
+    Each script page displays the bash command to run
+  </Step>
+  
+  <Step title="Run from Proxmox Shell">
+    Copy the command and paste it into your Proxmox shell
+  </Step>
+</Steps>
+
+<Info>
+  PVEScripts-Local provides a **local mirror** of the script catalog. It doesn't execute scripts directly - it provides you with the commands to run in your Proxmox shell.
+</Info>
+
+### Updating PVEScripts-Local
+
+The application includes a built-in updater:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/pve-scripts-local.sh)" -s update
+```
+
+Or use the update button in the web interface.
+
+### Advantages
+
+<CardGroup cols={2}>
+  <Card title="No External Internet" icon="network-wired">
+    Browse scripts without visiting external websites
+  </Card>
+  <Card title="Centralized Access" icon="house">
+    All scripts in one convenient interface
+  </Card>
+  <Card title="Local Hosting" icon="server">
+    Runs on your own infrastructure
+  </Card>
+  <Card title="Easy Discovery" icon="magnifying-glass">
+    Search and filter capabilities
+  </Card>
+</CardGroup>
+
+### Learn More
+
+For full details, visit the [ProxmoxVE-Local GitHub repository](https://github.com/community-scripts/ProxmoxVE-Local).
+
+## Method 3: Virtual Machine Scripts
+
+Some scripts create full virtual machines instead of LXC containers. These are used for:
+
+- Operating systems that require full virtualization
+- Applications that need kernel modules or specialized hardware
+- Systems that don't run well in containers
+
+### VM Script Examples
+
+<CodeGroup>
+```bash Home Assistant OS VM
+# Creates a VM running Home Assistant Operating System
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/vm/haos-vm.sh)"
+```
+
+```bash Ubuntu 24.04 VM
+# Creates an Ubuntu 24.04 LTS virtual machine
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/vm/ubuntu2404-vm.sh)"
+```
+
+```bash Debian VM
+# Creates a Debian virtual machine
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/vm/debian-vm.sh)"
+```
+
+```bash OPNsense VM
+# Creates an OPNsense firewall VM
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/vm/opnsense-vm.sh)"
+```
+</CodeGroup>
+
+### How VM Scripts Differ
+
+<Note>
+  VM scripts use `vm/` directory instead of `ct/`. They create QEMU virtual machines rather than LXC containers.
+</Note>
+
+<CardGroup cols={2}>
+  <Card title="Full Virtualization" icon="computer">
+    VMs have their own kernel and can run any OS
+  </Card>
+  <Card title="Higher Resource Usage" icon="memory">
+    VMs require more RAM and CPU than containers
+  </Card>
+  <Card title="Hardware Passthrough" icon="microchip">
+    Can pass through GPUs, USB devices, etc.
+  </Card>
+  <Card title="Better Isolation" icon="shield">
+    Complete separation from host system
+  </Card>
+</CardGroup>
+
+## Method 4: Proxmox Tools (Host Scripts)
+
+These scripts run on your Proxmox **host** to configure or manage the server itself, not to create containers.
+
+### Post-Installation Setup
+
+Optimize your Proxmox host after initial installation:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/post-pve-install.sh)"
+```
+
+<Steps>
+  <Step title="Disable Enterprise Repository">
+    Removes the subscription-required repo (if you don't have a subscription)
+  </Step>
+  
+  <Step title="Enable No-Subscription Repository">
+    Adds the free community repository for updates
+  </Step>
+  
+  <Step title="Update System">
+    Runs `apt update` and `apt upgrade`
+  </Step>
+  
+  <Step title="Optional Enhancements">
+    Offers to install useful tools and tweaks
+  </Step>
+</Steps>
+
+### Other Useful Host Tools
+
+<CodeGroup>
+```bash Update All Containers
+# Update all LXC containers in one command
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/update-lxcs.sh)"
+```
+
+```bash Kernel Cleanup
+# Remove old kernel versions to free disk space
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/kernel-clean.sh)"
+```
+
+```bash Microcode Updates
+# Install CPU microcode updates for Intel/AMD
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/microcode.sh)"
+```
+
+```bash USB Passthrough Setup
+# Configure USB passthrough for containers
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/usb-passthrough.sh)"
+```
+</CodeGroup>
+
+<Warning>
+  Host tools modify your Proxmox server configuration. Always review what they do before running them.
+</Warning>
+
+## Updating Installed Applications
+
+Most scripts include an update function. To update an installed application:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/SCRIPT_NAME.sh)" -s update
+```
+
+### Examples
+
+<CodeGroup>
+```bash Update Docker
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)" -s update
+
+# Updates:
+# - Docker Engine
+# - Docker Compose
+# - Portainer (if installed)
+# - Portainer Agent (if installed)
+```
+
+```bash Update Nginx Proxy Manager
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/nginx-proxy-manager.sh)" -s update
+
+# Updates to latest version from GitHub releases
+```
+
+```bash Update Uptime Kuma
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/uptimekuma.sh)" -s update
+
+# Pulls latest from GitHub and rebuilds
+```
+</CodeGroup>
+
+<Info>
+  Some applications (like AdGuard Home) update through their own web interface. The update script will inform you if this is the case.
+</Info>
+
+## Advanced: Script Arguments
+
+Scripts support various arguments for automation and customization.
+
+### Common Arguments
+
+```bash
+# Update an existing installation
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)" -s update
+
+# Verbose output (show all commands)
+VERBOSE=yes bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)"
+
+# Development/debug mode
+DEV_MODE_LOGS=true bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)"
+```
+
+### Pre-Setting Variables
+
+You can pre-configure installation settings using environment variables:
+
+```bash
+# Example: Set custom resources for Docker container
+var_cpu=4 var_ram=8192 var_disk=20 \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)"
+```
+
+<Tip>
+  This is useful for automation scripts or when you want to skip interactive prompts.
+</Tip>
+
+## Choosing the Right Method
+
+<CardGroup cols={2}>
+  <Card title="Direct Bash Commands" icon="terminal">
+    **Best for:**
+    - One-off installations
+    - Following documentation
+    - Always getting latest version
+    - Quick deployments
+  </Card>
+  
+  <Card title="PVEScripts-Local" icon="browser">
+    **Best for:**
+    - Browsing available scripts
+    - Frequent installations
+    - Offline/airgapped environments
+    - Centralized management
+  </Card>
+  
+  <Card title="VM Scripts" icon="computer">
+    **Best for:**
+    - Full operating systems
+    - Hardware passthrough needs
+    - Kernel-dependent applications
+    - Maximum isolation
+  </Card>
+  
+  <Card title="Host Tools" icon="server">
+    **Best for:**
+    - Proxmox server configuration
+    - Batch container updates
+    - System maintenance
+    - Host-level modifications
+  </Card>
+</CardGroup>
+
+## Script Repository Structure
+
+Understanding the repository helps you find the right scripts:
+
+```bash
+ProxmoxVE/
+├── ct/                    # Container (LXC) creation scripts
+│   ├── docker.sh
+│   ├── adguard.sh
+│   ├── homeassistant.sh
+│   └── ... 200+ more
+│
+├── install/               # Installation scripts (run inside containers)
+│   ├── docker-install.sh
+│   ├── adguard-install.sh
+│   ├── homeassistant-install.sh
+│   └── ...
+│
+├── vm/                    # Virtual machine creation scripts
+│   ├── haos-vm.sh
+│   ├── ubuntu2404-vm.sh
+│   └── ...
+│
+├── tools/                 # Host and utility scripts
+│   ├── pve/              # Proxmox host tools
+│   │   ├── post-pve-install.sh
+│   │   ├── update-lxcs.sh
+│   │   └── ...
+│   └── addon/            # Add-on installers for existing containers
+│       ├── webmin.sh
+│       ├── netdata.sh
+│       └── ...
+│
+└── misc/                  # Framework and helper functions
+    ├── build.func        # Container creation framework
+    ├── install.func      # Installation helpers
+    └── ...
+```
+
+<Note>
+  Users run **ct/** or **vm/** scripts. These automatically call the corresponding **install/** scripts internally.
+</Note>
+
+## Troubleshooting Installation Methods
+
+<AccordionGroup>
+  <Accordion title="Curl command not found">
+    Install curl on your Proxmox host:
+    ```bash
+    apt update && apt install -y curl
+    ```
+  </Accordion>
+  
+  <Accordion title="Script download fails">
+    Check internet connectivity from Proxmox:
+    ```bash
+    ping -c 4 8.8.8.8
+    curl -I https://raw.githubusercontent.com
+    ```
+    
+    Verify DNS is working:
+    ```bash
+    nslookup github.com
+    ```
+  </Accordion>
+  
+  <Accordion title="PVEScripts-Local won't start">
+    Check the container status:
+    ```bash
+    pct status <CONTAINER_ID>
+    pct start <CONTAINER_ID>
+    ```
+    
+    View logs:
+    ```bash
+    pct enter <CONTAINER_ID>
+    journalctl -xe
+    ```
+  </Accordion>
+  
+  <Accordion title="Update command doesn't work">
+    Ensure you're running the update in the Proxmox **host** shell, not inside a container.
+    
+    The `-s update` flag must come after the script URL:
+    ```bash
+    # ✓ Correct
+    bash -c "$(curl -fsSL URL)" -s update
+    
+    # ✗ Wrong
+    bash -c "$(curl -fsSL URL -s update)"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Always Review Scripts">
+    Before running any script, review it on GitHub to understand what it does:
+    ```
+    https://github.com/community-scripts/ProxmoxVE/blob/main/ct/SCRIPT_NAME.sh
+    ```
+  </Step>
+  
+  <Step title="Use Simple Mode Initially">
+    When first trying a script, use default settings. You can adjust later.
+  </Step>
+  
+  <Step title="Document Your Containers">
+    Keep track of what you've installed and which container IDs they use.
+  </Step>
+  
+  <Step title="Regular Updates">
+    Run update commands periodically to keep applications current:
+    ```bash
+    bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/tools/pve/update-lxcs.sh)"
+    ```
+  </Step>
+  
+  <Step title="Backup Before Updates">
+    Create Proxmox backups before running major updates.
+  </Step>
+</Steps>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Try the Quick Start" icon="rocket" href="/getting-started/quickstart">
+    Install your first application step-by-step
+  </Card>
+  <Card title="Browse Available Scripts" icon="grid" href="https://helper-scripts.com">
+    Explore 200+ ready-to-use scripts
+  </Card>
+</CardGroup>

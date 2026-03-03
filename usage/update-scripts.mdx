@@ -1,0 +1,416 @@
+---
+title: Update Scripts
+description: Learn how to update containers and applications using the update_script function
+---
+
+Every LXC container script includes an `update_script()` function that updates the application to the latest version. This provides a standardized way to keep your self-hosted applications up-to-date.
+
+## Using Update Scripts
+
+<Steps>
+  <Step title="Enter the Container">
+    Access the container you want to update:
+
+    ```bash
+    pct enter <container-id>
+    ```
+
+    Or use the container's shell from the Proxmox web interface.
+  </Step>
+
+  <Step title="Run the Update Script">
+    Execute the same script you used to create the container:
+
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+    ```
+
+    The script automatically detects an existing installation and runs the update function.
+  </Step>
+
+  <Step title="Wait for Update">
+    The update script will:
+    - Check container resources
+    - Update the base system
+    - Update the application
+    - Restart services if needed
+    - Display completion status
+  </Step>
+</Steps>
+
+## How Update Scripts Work
+
+Each container script contains an `update_script()` function:
+
+```bash
+function update_script() {
+  header_info
+  check_container_storage
+  check_container_resources
+  
+  msg_info "Updating base system"
+  $STD apt update
+  $STD apt upgrade -y 
+  msg_ok "Base system updated"
+  
+  msg_info "Updating Application"
+  # Application-specific update logic
+  msg_ok "Application updated"
+  
+  msg_ok "Updated successfully!"
+  exit
+}
+```
+
+### What Gets Updated
+
+1. **Base System**: Debian/Ubuntu packages
+2. **Application**: The main software (Docker, Nginx, etc.)
+3. **Dependencies**: Libraries and tools the app needs
+4. **Services**: Systemd services are restarted if required
+
+<Note>
+The update process is tailored to each application's update methodology.
+</Note>
+
+## Update Examples
+
+### Docker Container
+
+Updating a Docker container updates Docker Engine and optionally Portainer:
+
+```bash
+# Enter container
+pct enter 100
+
+# Run update
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+```
+
+The script updates:
+- `docker-ce`
+- `docker-ce-cli`
+- `containerd.io`
+- `docker-compose-plugin`
+- `docker-buildx-plugin`
+- Portainer (if installed)
+- Portainer Agent (if installed)
+
+### Home Assistant Core
+
+```bash
+# Enter container
+pct enter 101
+
+# Run update
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/homeassistant.sh)"
+```
+
+Updates Home Assistant to the latest stable version from PyPI.
+
+### Nginx Proxy Manager
+
+```bash
+# Enter container  
+pct enter 102
+
+# Run update
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/nginxproxymanager.sh)"
+```
+
+Updates Nginx Proxy Manager from the official repository.
+
+## Update Behaviors
+
+### Automatic Updates
+
+Most scripts fully automate updates:
+
+```bash
+function update_script() {
+  header_info
+  check_container_storage
+  check_container_resources
+  
+  msg_info "Updating ${APP}"
+  # Downloads and installs latest version
+  # Restarts services automatically
+  msg_ok "${APP} updated successfully"
+  exit
+}
+```
+
+### Manual Updates
+
+Some applications must be updated through their web interface:
+
+```bash
+function update_script() {
+  header_info
+  check_container_storage
+  check_container_resources
+  
+  if [[ ! -d /opt/AdGuardHome ]]; then
+    msg_error "No ${APP} Installation Found!"
+    exit
+  fi
+  msg_error "Adguard Home can only be updated via the user interface."
+  exit
+}
+```
+
+Applications like AdGuard Home, Unifi Controller, and others with web-based updates will display instructions.
+
+### Conditional Updates
+
+Some scripts check for optional components:
+
+```bash
+function update_script() {
+  # Update base application
+  msg_info "Updating ${APP}"
+  # ... update logic ...
+  msg_ok "${APP} updated"
+  
+  # Check for optional Portainer
+  if docker ps -a --format '{{.Names}}' | grep -q '^portainer$'; then
+    msg_info "Updating Portainer"
+    # ... update Portainer ...
+    msg_ok "Portainer updated"
+  fi
+  
+  exit
+}
+```
+
+## Checking for Updates
+
+Before updating, you can check if updates are available:
+
+```bash
+# Inside container
+apt update
+apt list --upgradable
+```
+
+For application-specific versions:
+
+```bash
+# Check Docker version
+docker --version
+
+# Check available Docker versions
+apt-cache policy docker-ce
+
+# Check Home Assistant version
+ha --version  # or pip3 list | grep homeassistant
+```
+
+## Bulk Updates
+
+### Update All Containers
+
+Use the PVE management tool to update all containers at once:
+
+```bash
+# On Proxmox host
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs.sh)"
+```
+
+This script:
+1. Lists all running containers
+2. Updates the base system in each
+3. Runs application update scripts
+4. Shows update status for each container
+
+### Schedule Automatic Updates
+
+Configure automatic nightly updates:
+
+```bash
+# On Proxmox host
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs-cron.sh)"
+```
+
+Sets up a cron job to update containers automatically.
+
+<Warning>
+Automatic updates may cause brief service interruptions. Review your uptime requirements before enabling.
+</Warning>
+
+## Update Safety
+
+### Pre-Update Checklist
+
+Before running updates:
+
+<Steps>
+  <Step title="Create a Backup">
+    Backup the container in Proxmox:
+
+    ```bash
+    vzdump <container-id> --mode snapshot --compress zstd
+    ```
+  </Step>
+
+  <Step title="Check Disk Space">
+    Ensure adequate free space:
+
+    ```bash
+    df -h
+    ```
+  </Step>
+
+  <Step title="Review Changelog">
+    Check the application's changelog for breaking changes.
+  </Step>
+
+  <Step title="Test in Staging">
+    If possible, test the update on a clone first.
+  </Step>
+</Steps>
+
+### Post-Update Verification
+
+After updating:
+
+```bash
+# Check service status
+systemctl status <service-name>
+
+# Check application logs
+journalctl -u <service-name> -n 50
+
+# Verify application is accessible
+curl http://localhost:<port>
+```
+
+## Troubleshooting Updates
+
+### Update Fails
+
+If an update fails:
+
+```bash
+# Check available disk space
+df -h
+
+# Check for held packages
+apt-mark showhold
+
+# Try manual update
+apt update
+apt upgrade
+```
+
+### Service Won't Start
+
+If a service fails after update:
+
+```bash
+# Check service status
+systemctl status <service>
+
+# View detailed logs
+journalctl -xeu <service>
+
+# Restart the service
+systemctl restart <service>
+```
+
+### Rollback from Backup
+
+If an update causes issues:
+
+```bash
+# On Proxmox host
+# Stop the container
+pct stop <container-id>
+
+# Restore from backup
+pct restore <container-id> /path/to/backup.tar.zst
+
+# Start the container
+pct start <container-id>
+```
+
+## Update Frequency Recommendations
+
+| Application Type | Recommended Frequency |
+|------------------|----------------------|
+| Security-focused (firewalls, VPNs) | Weekly or automatic |
+| Production services | Monthly with testing |
+| Development environments | Weekly or on-demand |
+| Media servers | Monthly |
+| Home automation | Monthly or with feature releases |
+
+<Tip>
+Subscribe to application release notifications on GitHub to stay informed of important updates.
+</Tip>
+
+## Manual Update Methods
+
+Some applications require manual update steps:
+
+### Binary Updates
+
+Applications installed as binaries:
+
+```bash
+# Download latest release
+wget https://github.com/user/app/releases/latest/download/app
+
+# Stop service
+systemctl stop app
+
+# Replace binary
+mv app /usr/local/bin/app
+chmod +x /usr/local/bin/app
+
+# Start service
+systemctl start app
+```
+
+### Docker Compose Updates
+
+For Docker Compose stacks:
+
+```bash
+# Pull latest images
+docker compose pull
+
+# Recreate containers
+docker compose up -d
+
+# Remove old images
+docker image prune -f
+```
+
+### Python Application Updates
+
+For Python-based apps:
+
+```bash
+# Update via pip
+pip3 install --upgrade application-name
+
+# Restart service
+systemctl restart application
+```
+
+## Best Practices
+
+1. **Always Backup First**: Create a snapshot before any update
+2. **Read Release Notes**: Check for breaking changes
+3. **Update Base System**: Keep Debian/Ubuntu packages current
+4. **Test Updates**: Use staging environments when possible
+5. **Monitor After Updates**: Watch logs and metrics post-update
+6. **Schedule Wisely**: Update during maintenance windows
+7. **Document Changes**: Keep notes on what was updated and when
+
+## Next Steps
+
+- Set up [automated backups](/configuration/backups) before enabling automatic updates
+- Install [monitoring tools](/usage/management-tools) to track application health
+- Configure [update notifications](/configuration/notifications)
+- Review [security best practices](/security/hardening)

@@ -1,0 +1,451 @@
+---
+title: Alpine-based Container Scripts
+description: Complete list of 31 lightweight LXC container scripts using Alpine Linux
+---
+
+## Overview
+
+Alpine-based container scripts use Alpine Linux as the base operating system, resulting in significantly smaller container sizes and reduced resource footprint. These are ideal for resource-constrained environments and when running multiple instances of the same service.
+
+**Total Scripts: 31**
+
+## Advantages of Alpine
+
+<CardGroup cols={3}>
+  <Card title="Lightweight" icon="feather">
+    Base image ~5MB vs Debian's ~120MB
+  </Card>
+  <Card title="Fast Boot" icon="bolt">
+    Minimal services mean faster startup times
+  </Card>
+  <Card title="Security" icon="shield">
+    Smaller attack surface with fewer packages
+  </Card>
+</CardGroup>
+
+## Installation
+
+```bash
+bash -c "$(wget -qLO - https://github.com/tteck/Proxmox/raw/main/ct/alpine-APPNAME.sh)"
+```
+
+Replace `APPNAME` with the application name (e.g., `docker`, `grafana`, `wireguard`).
+
+## Available Alpine Scripts
+
+### Networking & Security
+
+<AccordionGroup>
+  <Accordion title="DNS & Network Services (2 scripts)">
+    **alpine-adguard.sh** - AdGuard Home DNS ad blocker
+    - Network-wide ad and tracker blocking
+    - DNS server with filtering capabilities
+    - Parental controls and safe browsing
+    - Detailed query logs and statistics
+    - ~50MB vs ~200MB for Debian version
+
+    **alpine-wireguard.sh** - WireGuard VPN
+    - Modern, fast VPN tunnel
+    - Minimal configuration required
+    - Low overhead and high performance
+    - Perfect for site-to-site or road warrior setups
+  </Accordion>
+
+  <Accordion title="Reverse Proxy & Web Servers (2 scripts)">
+    **alpine-caddy.sh** - Caddy web server
+    - Automatic HTTPS with Let's Encrypt
+    - Simple configuration syntax
+    - Built-in reverse proxy capabilities
+    - HTTP/3 support out of the box
+    - ~30MB container size
+
+    **alpine-traefik.sh** - Traefik reverse proxy
+    - Dynamic configuration from Docker/Kubernetes
+    - Automatic SSL certificate management
+    - Load balancing and circuit breakers
+    - Metrics and monitoring built-in
+    - Lightweight alternative to Nginx Proxy Manager
+  </Accordion>
+</AccordionGroup>
+
+### Container Platforms
+
+<Accordion title="Container Runtime (1 script)">
+  **alpine-docker.sh** - Docker container platform
+  - Full Docker engine on Alpine base
+  - Significantly smaller than Debian Docker LXC
+  - Ideal for running containerized workloads
+  - Docker Compose included
+  - Perfect for microservices architecture
+  - Resource-efficient for hosting multiple containers
+</Accordion>
+
+### Monitoring & Observability
+
+<AccordionGroup>
+  <Accordion title="Metrics & Monitoring (4 scripts)">
+    **alpine-grafana.sh** - Grafana analytics platform
+    - Beautiful dashboards for metrics visualization
+    - Supports multiple data sources
+    - Alerting and notifications
+    - ~80MB vs ~250MB Debian version
+
+    **alpine-prometheus.sh** - Prometheus monitoring
+    - Time-series database for metrics
+    - Powerful query language (PromQL)
+    - Service discovery capabilities
+    - Integrates perfectly with Grafana
+    - Lightweight for multi-node deployments
+
+    **alpine-loki.sh** - Loki log aggregation
+    - Horizontally-scalable log aggregation
+    - Like Prometheus, but for logs
+    - Efficient indexing and storage
+    - Grafana integration for log visualization
+
+    **alpine-gatus.sh** - Gatus health monitoring
+    - Automated service health dashboard
+    - HTTP/TCP/ICMP monitoring
+    - Beautiful, responsive UI
+    - Alerting via multiple channels
+    - Minimal resource usage
+  </Accordion>
+</AccordionGroup>
+
+### Databases
+
+<AccordionGroup>
+  <Accordion title="SQL Databases (2 scripts)">
+    **alpine-mariadb.sh** - MariaDB database server
+    - MySQL-compatible relational database
+    - Perfect for web applications
+    - ~60MB vs ~180MB Debian version
+    - Full SQL compliance
+
+    **alpine-postgresql.sh** - PostgreSQL database
+    - Advanced open-source relational database
+    - ACID compliant with rich feature set
+    - Excellent for complex queries
+    - JSON and advanced data type support
+  </Accordion>
+
+  <Accordion title="NoSQL & Cache (2 scripts)">
+    **alpine-redis.sh** - Redis data store
+    - In-memory key-value store
+    - Sub-millisecond latency
+    - Pub/sub messaging
+    - Perfect for caching and sessions
+    - ~20MB container size
+
+    **alpine-valkey.sh** - Valkey key-value store
+    - High-performance Redis fork
+    - Drop-in Redis replacement
+    - Community-driven development
+    - Same API as Redis
+  </Accordion>
+</AccordionGroup>
+
+### Development Tools
+
+<AccordionGroup>
+  <Accordion title="Version Control (2 scripts)">
+    **alpine-gitea.sh** - Gitea Git service
+    - Lightweight self-hosted Git service
+    - GitHub-like interface
+    - Issue tracking and pull requests
+    - CI/CD integration
+    - ~40MB vs ~150MB Debian version
+
+    **alpine-forgejo.sh** - Forgejo Git forge
+    - Community-driven Gitea fork
+    - Same features as Gitea
+    - Privacy-focused development
+    - Lightweight and fast
+  </Accordion>
+
+  <Accordion title="Automation (1 script)">
+    **alpine-node-red.sh** - Node-RED flow programming
+    - Visual programming for IoT
+    - Drag-and-drop flow editor
+    - Extensive node library
+    - MQTT, HTTP, WebSocket support
+    - Perfect for home automation integration
+  </Accordion>
+</AccordionGroup>
+
+### File Storage & Sync
+
+<AccordionGroup>
+  <Accordion title="Cloud Storage (3 scripts)">
+    **alpine-nextcloud.sh** - Nextcloud platform
+    - Self-hosted file sync and share
+    - Calendar, contacts, and more
+    - Mobile apps available
+    - ~120MB vs ~300MB+ Debian version
+    - Office integration available
+
+    **alpine-rclone.sh** - Rclone cloud sync
+    - Sync files to/from cloud storage
+    - Supports 40+ cloud providers
+    - Mount cloud storage as filesystem
+    - Encryption and compression
+    - Scheduled backups
+
+    **alpine-syncthing.sh** - Syncthing file sync
+    - Continuous file synchronization
+    - Peer-to-peer, no central server
+    - End-to-end encryption
+    - Cross-platform support
+    - ~25MB container size
+  </Accordion>
+
+  <Accordion title="Object Storage (1 script)">
+    **alpine-garage.sh** - Garage object storage
+    - Distributed S3-compatible storage
+    - Self-hostable alternative to MinIO
+    - Geo-distributed capabilities
+    - Lightweight and efficient
+  </Accordion>
+</AccordionGroup>
+
+### Download Clients
+
+<Accordion title="BitTorrent (1 script)">
+  **alpine-transmission.sh** - Transmission BitTorrent
+  - Fast, lightweight BitTorrent client
+  - Web interface included
+  - Low resource usage
+  - ~15MB vs ~100MB Debian version
+  - Perfect for seedboxes
+  - Supports scheduling and bandwidth limits
+</Accordion>
+
+### Media & Entertainment
+
+<Accordion title="Media Tools (2 scripts)">
+  **alpine-bitmagnet.sh** - Bitmagnet DHT indexer
+  - Self-hosted BitTorrent DHT search engine
+  - Discover torrents from the DHT network
+  - No external indexers needed
+  - Built-in web interface
+
+  **alpine-zigbee2mqtt.sh** - Zigbee to MQTT bridge
+  - Connect Zigbee devices to MQTT
+  - Works with 2000+ Zigbee devices
+  - Essential for smart home setups
+  - Integrates with Home Assistant
+  - ~40MB vs ~120MB Debian version
+</Accordion>
+
+### Communication
+
+<Accordion title="Voice Servers (1 script)">
+  **alpine-teamspeak-server.sh** - TeamSpeak voice server
+  - Crystal-clear voice communication
+  - Low latency for gaming
+  - Advanced permission system
+  - File sharing capabilities
+  - ~30MB vs ~100MB+ Debian version
+</Accordion>
+
+### Security & Authentication
+
+<Accordion title="Password Management (2 scripts)">
+  **alpine-vaultwarden.sh** - Vaultwarden password manager
+  - Bitwarden-compatible server
+  - Encrypted password vault
+  - Browser extensions available
+  - 2FA support
+  - ~20MB vs ~100MB Debian version
+  - Perfect for self-hosted password management
+
+  **alpine-tinyauth.sh** - TinyAuth service
+  - Minimal authentication service
+  - SSO capabilities
+  - Extremely lightweight
+  - Simple configuration
+</Accordion>
+
+### Utilities
+
+<AccordionGroup>
+  <Accordion title="Pastebins (1 script)">
+    **alpine-rustypaste.sh** - Rusty Paste server
+    - Minimal file upload/pastebin service
+    - Syntax highlighting for code
+    - File expiration support
+    - Simple and fast
+    - ~10MB container size
+  </Accordion>
+
+  <Accordion title="Web Services (2 scripts)">
+    **alpine-it-tools.sh** - IT Tools collection
+    - Collection of handy developer tools
+    - Encoders, generators, converters
+    - No data leaves your server
+    - Lightweight web interface
+
+    **alpine-redlib.sh** - Redlib Reddit frontend
+    - Privacy-friendly Reddit frontend
+    - No JavaScript required
+    - RSS feeds for subreddits
+    - Lightweight and fast
+  </Accordion>
+
+  <Accordion title="Infrastructure Management (2 scripts)">
+    **alpine-komodo.sh** - Komodo server manager
+    - Infrastructure management platform
+    - Docker container management
+    - Server monitoring
+    - Deployment automation
+
+    **alpine-rustdeskserver.sh** - RustDesk server
+    - Self-hosted remote desktop relay
+    - Alternative to TeamViewer/AnyDesk
+    - End-to-end encryption
+    - Cross-platform support
+    - ~25MB container size
+  </Accordion>
+</AccordionGroup>
+
+## Performance Comparison
+
+<Tabs>
+  <Tab title="Resource Usage">
+    | Application | Alpine RAM | Debian RAM | Alpine Size | Debian Size |
+    |------------|------------|------------|-------------|-------------|
+    | Grafana    | ~80MB      | ~250MB     | ~80MB       | ~350MB      |
+    | MariaDB    | ~60MB      | ~180MB     | ~60MB       | ~250MB      |
+    | Nextcloud  | ~120MB     | ~300MB+    | ~150MB      | ~500MB+     |
+    | Docker     | ~100MB     | ~200MB     | ~120MB      | ~400MB      |
+    | Vaultwarden| ~20MB      | ~100MB     | ~25MB       | ~150MB      |
+    | Redis      | ~15MB      | ~50MB      | ~20MB       | ~100MB      |
+  </Tab>
+
+  <Tab title="Boot Times">
+    Alpine containers typically boot 30-50% faster than Debian equivalents:
+    - **Alpine Docker**: ~3-5 seconds
+    - **Debian Docker**: ~8-12 seconds
+    - **Alpine Grafana**: ~2-3 seconds
+    - **Debian Grafana**: ~5-8 seconds
+  </Tab>
+
+  <Tab title="Disk I/O">
+    Reduced package count means:
+    - Faster updates
+    - Less disk I/O during boot
+    - Quicker backups
+    - Smaller backup sizes
+  </Tab>
+</Tabs>
+
+## When to Use Alpine
+
+<CardGroup cols={2}>
+  <Card title="Resource-Constrained" icon="microchip">
+    Limited RAM or storage? Alpine's small footprint is ideal.
+  </Card>
+  <Card title="Multiple Instances" icon="clone">
+    Running many containers? Save resources with Alpine.
+  </Card>
+  <Card title="Production Services" icon="server">
+    Critical services benefit from Alpine's minimal attack surface.
+  </Card>
+  <Card title="Edge Deployment" icon="network-wired">
+    IoT or edge computing? Alpine's size is perfect.
+  </Card>
+</CardGroup>
+
+## When to Use Debian Instead
+
+<Accordion title="Compatibility Considerations">
+  Consider using Debian-based scripts when:
+  - Application requires specific system libraries not in Alpine
+  - You need the widest software compatibility
+  - The application uses glibc-specific features (Alpine uses musl)
+  - You're unfamiliar with Alpine's package manager (apk)
+  - The application has no official Alpine support
+</Accordion>
+
+## Alpine-Specific Notes
+
+<AccordionGroup>
+  <Accordion title="Package Management">
+    Alpine uses `apk` instead of `apt`:
+    ```bash
+    apk update              # Update package index
+    apk add package-name    # Install package
+    apk del package-name    # Remove package
+    apk search keyword      # Search for packages
+    apk info package-name   # Package information
+    ```
+  </Accordion>
+
+  <Accordion title="Init System">
+    Alpine uses OpenRC instead of systemd:
+    ```bash
+    rc-service name start   # Start service
+    rc-service name stop    # Stop service
+    rc-service name restart # Restart service
+    rc-update add name      # Enable on boot
+    rc-status               # Show service status
+    ```
+  </Accordion>
+
+  <Accordion title="C Library">
+    Alpine uses musl libc instead of glibc:
+    - Smaller and more efficient
+    - Some binary applications may require compatibility layers
+    - Most modern applications compile fine with musl
+    - Better for security-conscious deployments
+  </Accordion>
+</AccordionGroup>
+
+## Update Scripts
+
+Most Alpine scripts include update utilities in `/usr/local/bin/`:
+
+```bash
+update-appname  # Run application-specific update
+```
+
+## Common Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Microservices" icon="cubes">
+    Deploy multiple lightweight services efficiently
+  </Card>
+  <Card title="Development" icon="code">
+    Fast-spinning test environments with minimal overhead
+  </Card>
+  <Card title="CI/CD" icon="rotate">
+    Quick container builds and deployments
+  </Card>
+  <Card title="Edge Computing" icon="sitemap">
+    IoT gateways and edge nodes with limited resources
+  </Card>
+</CardGroup>
+
+## Migration Guide
+
+<Accordion title="Moving from Debian to Alpine">
+  1. **Export Data**: Backup application data and configurations
+  2. **Deploy Alpine**: Create new Alpine-based container
+  3. **Restore Data**: Import data to new container
+  4. **Test Thoroughly**: Verify all functionality works
+  5. **Update Integrations**: Point dependent services to new container
+  6. **Remove Old Container**: Clean up Debian container after verification
+
+  **Note**: Some applications may require configuration adjustments due to different file paths or service names.
+</Accordion>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Debian Scripts" icon="debian" href="/reference/containers/debian-based">
+    Full-featured Debian-based alternatives
+  </Card>
+  <Card title="Container Overview" icon="layer-group" href="/reference/containers/overview">
+    Back to container scripts overview
+  </Card>
+</CardGroup>

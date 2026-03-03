@@ -1,0 +1,790 @@
+---
+title: Security Hardening Guide
+description: Best practices for securing Proxmox VE containers, virtual machines, and the host system
+---
+
+This comprehensive guide covers security best practices for Proxmox VE environments, from host hardening to container security.
+
+## Overview
+
+Security should be implemented at multiple layers:
+
+<CardGroup cols={3}>
+  <Card title="Host Security" icon="server" color="#e74c3c">
+    Secure the Proxmox host itself
+  </Card>
+  
+  <Card title="Container Security" icon="cube">
+    Harden LXC containers and VMs
+  </Card>
+  
+  <Card title="Network Security" icon="network-wired">
+    Firewall and network isolation
+  </Card>
+</CardGroup>
+
+## Proxmox Host Hardening
+
+### Secure SSH Access
+
+<Steps>
+  <Step title="Disable Root Login">
+    Edit `/etc/ssh/sshd_config`:
+    ```bash
+    PermitRootLogin no
+    ```
+    
+    Create a sudo user:
+    ```bash
+    adduser admin
+    usermod -aG sudo admin
+    ```
+  </Step>
+  
+  <Step title="Use SSH Keys">
+    ```bash
+    # On your local machine
+    ssh-keygen -t ed25519 -C "your_email@example.com"
+    
+    # Copy to Proxmox host
+    ssh-copy-id admin@proxmox-host
+    ```
+    
+    Disable password authentication:
+    ```bash
+    # In /etc/ssh/sshd_config
+    PasswordAuthentication no
+    PubkeyAuthentication yes
+    ```
+  </Step>
+  
+  <Step title="Change SSH Port (Optional)">
+    ```bash
+    # In /etc/ssh/sshd_config
+    Port 2222
+    ```
+  </Step>
+  
+  <Step title="Restart SSH">
+    ```bash
+    systemctl restart sshd
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+Before disabling root login or password authentication, ensure you can login with your new user and SSH key!
+</Warning>
+
+### Enable Two-Factor Authentication
+
+<Steps>
+  <Step title="Install Required Package">
+    ```bash
+    apt update
+    apt install libpam-google-authenticator
+    ```
+  </Step>
+  
+  <Step title="Configure for User">
+    ```bash
+    # Login as user
+    google-authenticator
+    ```
+    
+    Answer:
+    - Time-based tokens: **Y**
+    - Update .google_authenticator: **Y**
+    - Disallow multiple uses: **Y**
+    - Increase window: **N**
+    - Enable rate-limiting: **Y**
+  </Step>
+  
+  <Step title="Update PAM Configuration">
+    Add to `/etc/pam.d/sshd`:
+    ```bash
+    auth required pam_google_authenticator.so
+    ```
+  </Step>
+  
+  <Step title="Update SSH Configuration">
+    In `/etc/ssh/sshd_config`:
+    ```bash
+    ChallengeResponseAuthentication yes
+    ```
+  </Step>
+  
+  <Step title="Restart SSH">
+    ```bash
+    systemctl restart sshd
+    ```
+  </Step>
+</Steps>
+
+### Configure Firewall
+
+<Steps>
+  <Step title="Enable Firewall at Datacenter Level">
+    1. **Datacenter** → **Firewall** → **Options**
+    2. Enable: **Firewall**
+  </Step>
+  
+  <Step title="Create Security Group">
+    **Datacenter** → **Firewall** → **Security Group** → **Create**
+    
+    Name: `management`
+    
+    Add rules:
+    ```
+    IN ACCEPT -p tcp -dport 22 -source 192.168.1.0/24
+    IN ACCEPT -p tcp -dport 8006 -source 192.168.1.0/24
+    IN DROP
+    ```
+  </Step>
+  
+  <Step title="Apply to Host">
+    **Node** → **Firewall** → **Options**
+    
+    Enable firewall and apply security group
+  </Step>
+</Steps>
+
+### Automatic Security Updates
+
+<Steps>
+  <Step title="Install Unattended Upgrades">
+    ```bash
+    apt install unattended-upgrades apt-listchanges
+    ```
+  </Step>
+  
+  <Step title="Configure Updates">
+    Edit `/etc/apt/apt.conf.d/50unattended-upgrades`:
+    ```bash
+    Unattended-Upgrade::Origins-Pattern {
+        "origin=Debian,codename=${distro_codename},label=Debian-Security";
+        "origin=Proxmox";
+    };
+    
+    Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+    Unattended-Upgrade::Remove-Unused-Dependencies "true";
+    Unattended-Upgrade::Automatic-Reboot "false";
+    ```
+  </Step>
+  
+  <Step title="Enable Auto-Updates">
+    Edit `/etc/apt/apt.conf.d/20auto-upgrades`:
+    ```bash
+    APT::Periodic::Update-Package-Lists "1";
+    APT::Periodic::Unattended-Upgrade "1";
+    APT::Periodic::AutocleanInterval "7";
+    ```
+  </Step>
+</Steps>
+
+<Note>
+Set `Automatic-Reboot "true"` if you want automatic reboots for kernel updates, but schedule appropriately.
+</Note>
+
+### Fail2Ban Protection
+
+<Steps>
+  <Step title="Install Fail2Ban">
+    ```bash
+    apt install fail2ban
+    ```
+  </Step>
+  
+  <Step title="Configure SSH Protection">
+    Create `/etc/fail2ban/jail.local`:
+    ```ini
+    [DEFAULT]
+    bantime = 1h
+    findtime = 10m
+    maxretry = 5
+    
+    [sshd]
+    enabled = true
+    port = ssh
+    logpath = /var/log/auth.log
+    
+    [proxmox]
+    enabled = true
+    port = https,http,8006
+    logpath = /var/log/daemon.log
+    maxretry = 3
+    bantime = 1h
+    ```
+  </Step>
+  
+  <Step title="Start Fail2Ban">
+    ```bash
+    systemctl enable fail2ban
+    systemctl start fail2ban
+    ```
+  </Step>
+  
+  <Step title="Monitor Bans">
+    ```bash
+    # Check status
+    fail2ban-client status
+    
+    # Check specific jail
+    fail2ban-client status sshd
+    
+    # Unban IP
+    fail2ban-client set sshd unbanip 192.168.1.100
+    ```
+  </Step>
+</Steps>
+
+## Container Security
+
+### Unprivileged Containers
+
+<CardGroup cols={2}>
+  <Card title="Unprivileged (Recommended)" icon="user-shield" color="#27ae60">
+    **Benefits:**
+    - Root in container ≠ root on host
+    - Better security isolation
+    - Limited escape vectors
+    - Default for new scripts
+  </Card>
+  
+  <Card title="Privileged" icon="crown" color="#e74c3c">
+    **Use Only When:**
+    - Hardware access needed
+    - Special capabilities required
+    - Docker in LXC (with caution)
+  </Card>
+</CardGroup>
+
+**Create unprivileged container:**
+```bash
+pct create 100 local:vztmpl/debian-13-standard_13.0-1_amd64.tar.zst \
+  --unprivileged 1 \
+  --hostname secure-ct
+```
+
+<Tip>
+All community scripts default to unprivileged containers when possible.
+</Tip>
+
+### AppArmor Profiles
+
+AppArmor provides additional security for containers:
+
+<Steps>
+  <Step title="Check AppArmor Status">
+    ```bash
+    aa-status
+    ```
+  </Step>
+  
+  <Step title="Enable AppArmor for Container">
+    ```bash
+    pct set <CTID> -features nesting=1,keyctl=1
+    pct set <CTID> -protection 1
+    ```
+  </Step>
+  
+  <Step title="Apply Specific Profile">
+    Edit `/etc/pve/lxc/<CTID>.conf`:
+    ```bash
+    lxc.apparmor.profile: lxc-container-default-cgns
+    ```
+  </Step>
+</Steps>
+
+### Container Hardening
+
+<Tabs>
+  <Tab title="Limit Capabilities">
+    Remove unnecessary Linux capabilities:
+    ```bash
+    # Edit /etc/pve/lxc/<CTID>.conf
+    lxc.cap.drop: sys_module sys_rawio mknod
+    ```
+    
+    Common capabilities to drop:
+    - `sys_module` - Load kernel modules
+    - `sys_rawio` - Raw I/O operations
+    - `mknod` - Create device nodes
+    - `sys_time` - Set system time
+  </Tab>
+  
+  <Tab title="Restrict System Calls">
+    Use seccomp to filter syscalls:
+    ```bash
+    # Edit /etc/pve/lxc/<CTID>.conf
+    lxc.seccomp.profile: /usr/share/lxc/config/common.seccomp
+    ```
+  </Tab>
+  
+  <Tab title="Mount Options">
+    Configure secure mount options:
+    ```bash
+    # Edit /etc/pve/lxc/<CTID>.conf
+    lxc.mount.auto: proc:mixed sys:ro cgroup:mixed
+    ```
+  </Tab>
+</Tabs>
+
+### Resource Limits
+
+Prevent resource exhaustion:
+
+```bash
+# CPU limit (cores)
+pct set <CTID> -cores 2
+
+# CPU units (relative weight)
+pct set <CTID> -cpuunits 1024
+
+# Memory limit
+pct set <CTID> -memory 2048
+
+# Swap limit
+pct set <CTID> -swap 512
+
+# Disk I/O limit (MB/s)
+pct set <CTID> -rootfs local-lvm:8,mbps_rd=100,mbps_wr=50
+```
+
+## Application Security
+
+### Secure Web Applications
+
+<Steps>
+  <Step title="Use Reverse Proxy">
+    Install Nginx Proxy Manager:
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/nginxproxymanager.sh)"
+    ```
+    
+    Benefits:
+    - SSL/TLS termination
+    - Centralized access control
+    - Hide backend services
+  </Step>
+  
+  <Step title="Enable HTTPS">
+    Use Let's Encrypt for free SSL certificates:
+    1. Configure Nginx Proxy Manager
+    2. Add proxy host
+    3. Request SSL certificate
+    4. Force HTTPS redirect
+  </Step>
+  
+  <Step title="Security Headers">
+    Add security headers in Nginx:
+    ```nginx
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+    ```
+  </Step>
+</Steps>
+
+### Database Security
+
+<AccordionGroup>
+  <Accordion title="PostgreSQL Hardening">
+    ```bash
+    # Edit /etc/postgresql/15/main/pg_hba.conf
+    # Only allow local connections
+    local   all             all                                     peer
+    host    all             all             127.0.0.1/32            scram-sha-256
+    host    all             all             ::1/128                 scram-sha-256
+    
+    # Change password encryption
+    # In postgresql.conf
+    password_encryption = scram-sha-256
+    ```
+  </Accordion>
+  
+  <Accordion title="MariaDB/MySQL Hardening">
+    ```bash
+    # Run security script
+    mysql_secure_installation
+    
+    # Disable remote root login
+    DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+    
+    # Create app-specific users
+    CREATE USER 'appuser'@'localhost' IDENTIFIED BY 'strong_password';
+    GRANT SELECT, INSERT, UPDATE, DELETE ON appdb.* TO 'appuser'@'localhost';
+    FLUSH PRIVILEGES;
+    ```
+  </Accordion>
+  
+  <Accordion title="Redis Hardening">
+    ```bash
+    # Edit /etc/redis/redis.conf
+    bind 127.0.0.1 ::1
+    requirepass your_strong_password_here
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+    
+    # Disable dangerous commands
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    rename-command CONFIG "CONFIG_a1b2c3d4"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Docker Security
+
+<Tabs>
+  <Tab title="Docker Daemon">
+    Edit `/etc/docker/daemon.json`:
+    ```json
+    {
+      "userns-remap": "default",
+      "no-new-privileges": true,
+      "icc": false,
+      "log-driver": "json-file",
+      "log-opts": {
+        "max-size": "10m",
+        "max-file": "3"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Container Limits">
+    ```bash
+    docker run -d \
+      --memory="512m" \
+      --cpus="0.5" \
+      --pids-limit 200 \
+      --read-only \
+      --security-opt no-new-privileges \
+      --cap-drop ALL \
+      nginx:alpine
+    ```
+  </Tab>
+  
+  <Tab title="Docker Compose">
+    ```yaml
+    services:
+      web:
+        image: nginx:alpine
+        security_opt:
+          - no-new-privileges:true
+        cap_drop:
+          - ALL
+        read_only: true
+        mem_limit: 512m
+        cpus: 0.5
+        pids_limit: 200
+    ```
+  </Tab>
+</Tabs>
+
+## Network Security
+
+### VLAN Segmentation
+
+Isolate different types of services:
+
+<CardGroup cols={2}>
+  <Card title="Trusted Network" icon="shield-halved">
+    **VLAN 1 (Default)**
+    - Management interfaces
+    - Proxmox host
+    - Trusted services
+  </Card>
+  
+  <Card title="IoT/Untrusted" icon="wifi">
+    **VLAN 10**
+    - Smart home devices
+    - Home Assistant
+    - Limited internet access
+  </Card>
+  
+  <Card title="DMZ Services" icon="server">
+    **VLAN 20**
+    - Public-facing services
+    - Web servers
+    - Reverse proxies
+  </Card>
+  
+  <Card title="Guest Network" icon="users">
+    **VLAN 30**
+    - Guest Wi-Fi
+    - Internet-only access
+    - No local network access
+  </Card>
+</CardGroup>
+
+### Firewall Rules by Use Case
+
+<Tabs>
+  <Tab title="Web Server">
+    ```bash
+    # Allow HTTP/HTTPS from anywhere
+    IN ACCEPT -p tcp -dport 80
+    IN ACCEPT -p tcp -dport 443
+    
+    # Allow SSH from management network only
+    IN ACCEPT -p tcp -dport 22 -source 192.168.1.0/24
+    
+    # Drop everything else
+    IN DROP
+    ```
+  </Tab>
+  
+  <Tab title="Database Server">
+    ```bash
+    # Allow DB connection from app servers only
+    IN ACCEPT -p tcp -dport 5432 -source 192.168.1.0/24
+    
+    # Allow SSH from management
+    IN ACCEPT -p tcp -dport 22 -source 192.168.1.10
+    
+    # Drop everything else
+    IN DROP
+    ```
+  </Tab>
+  
+  <Tab title="IoT Container">
+    ```bash
+    # Allow access from trusted network
+    IN ACCEPT -p tcp -dport 8123 -source 192.168.1.0/24
+    
+    # Block access from IoT VLAN
+    IN DROP -source 10.0.10.0/24
+    
+    # Allow outbound for updates
+    OUT ACCEPT
+    ```
+  </Tab>
+</Tabs>
+
+### Intrusion Detection
+
+Monitor for suspicious activity:
+
+<Steps>
+  <Step title="Install Suricata">
+    ```bash
+    apt install suricata
+    ```
+  </Step>
+  
+  <Step title="Update Rules">
+    ```bash
+    suricata-update
+    ```
+  </Step>
+  
+  <Step title="Configure Interface">
+    Edit `/etc/suricata/suricata.yaml`:
+    ```yaml
+    af-packet:
+      - interface: vmbr0
+        cluster-id: 99
+        cluster-type: cluster_flow
+    ```
+  </Step>
+  
+  <Step title="Start Service">
+    ```bash
+    systemctl enable suricata
+    systemctl start suricata
+    ```
+  </Step>
+</Steps>
+
+## Backup Security
+
+### Encrypted Backups
+
+<Steps>
+  <Step title="Create Encrypted Storage">
+    ```bash
+    # Create encrypted directory
+    mkdir -p /backup/encrypted
+    
+    # Mount encrypted filesystem
+    pvesm add dir encrypted-backup --path /backup/encrypted --content backup
+    ```
+  </Step>
+  
+  <Step title="Backup with Encryption">
+    ```bash
+    # Using gpg encryption
+    vzdump <CTID> --storage local --compress zstd | gpg --encrypt --recipient your@email.com > backup.vma.zst.gpg
+    ```
+  </Step>
+</Steps>
+
+### Off-Site Backups
+
+<Tabs>
+  <Tab title="Rsync to Remote">
+    ```bash
+    # Automated rsync backup
+    rsync -avz --delete /var/lib/vz/dump/ user@backup-server:/backups/proxmox/
+    ```
+  </Tab>
+  
+  <Tab title="Cloud Storage">
+    ```bash
+    # Install rclone
+    curl https://rclone.org/install.sh | bash
+    
+    # Configure cloud storage
+    rclone config
+    
+    # Sync backups
+    rclone sync /var/lib/vz/dump/ remote:proxmox-backups/
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+Always test backup restoration regularly. An untested backup is not a backup.
+</Warning>
+
+## Monitoring and Auditing
+
+### Log Monitoring
+
+<Steps>
+  <Step title="Centralized Logging">
+    Install Loki for log aggregation:
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/alpine-loki.sh)"
+    ```
+  </Step>
+  
+  <Step title="Configure Log Forwarding">
+    Forward logs from containers to Loki
+  </Step>
+  
+  <Step title="Set Up Alerts">
+    Create alerts for:
+    - Failed login attempts
+    - High resource usage
+    - Service failures
+    - Unusual network traffic
+  </Step>
+</Steps>
+
+### Security Auditing
+
+<Tabs>
+  <Tab title="Lynis">
+    ```bash
+    # Install Lynis
+    apt install lynis
+    
+    # Run security audit
+    lynis audit system
+    
+    # Review results
+    cat /var/log/lynis.log
+    ```
+  </Tab>
+  
+  <Tab title="ClamAV">
+    ```bash
+    # Install ClamAV
+    apt install clamav clamav-daemon
+    
+    # Update virus definitions
+    freshclam
+    
+    # Scan system
+    clamscan -r /home
+    ```
+  </Tab>
+  
+  <Tab title="rkhunter">
+    ```bash
+    # Install rkhunter
+    apt install rkhunter
+    
+    # Update database
+    rkhunter --update
+    
+    # Run check
+    rkhunter --check
+    ```
+  </Tab>
+</Tabs>
+
+## Security Checklist
+
+<Steps>
+  <Step title="Host Security">
+    - [ ] SSH key authentication enabled
+    - [ ] Root login disabled
+    - [ ] Firewall configured
+    - [ ] Fail2Ban installed
+    - [ ] Automatic security updates enabled
+    - [ ] Two-factor authentication configured
+  </Step>
+  
+  <Step title="Container Security">
+    - [ ] Using unprivileged containers
+    - [ ] AppArmor profiles applied
+    - [ ] Resource limits set
+    - [ ] Unnecessary capabilities dropped
+    - [ ] Firewall rules configured
+  </Step>
+  
+  <Step title="Network Security">
+    - [ ] VLANs implemented
+    - [ ] Network segmentation configured
+    - [ ] Firewall rules tested
+    - [ ] Intrusion detection enabled
+  </Step>
+  
+  <Step title="Application Security">
+    - [ ] HTTPS enabled
+    - [ ] Strong passwords used
+    - [ ] Databases hardened
+    - [ ] Regular updates applied
+    - [ ] Security headers configured
+  </Step>
+  
+  <Step title="Backup & Recovery">
+    - [ ] Regular backups scheduled
+    - [ ] Backups tested
+    - [ ] Off-site backup configured
+    - [ ] Encryption enabled
+  </Step>
+  
+  <Step title="Monitoring">
+    - [ ] Log aggregation configured
+    - [ ] Security alerts set up
+    - [ ] Regular audits scheduled
+    - [ ] Incident response plan documented
+  </Step>
+</Steps>
+
+## Additional Resources
+
+<CardGroup cols={3}>
+  <Card title="Networking Guide" icon="network-wired" href="/guides/networking">
+    Advanced network configuration
+  </Card>
+  
+  <Card title="Docker Security" icon="docker" href="/guides/docker-setup">
+    Secure Docker deployment
+  </Card>
+  
+  <Card title="Popular Apps" icon="star" href="/guides/popular-apps">
+    Secure application deployment
+  </Card>
+</CardGroup>
+
+<Note>
+Security is an ongoing process. Regularly review and update your security measures.
+</Note>

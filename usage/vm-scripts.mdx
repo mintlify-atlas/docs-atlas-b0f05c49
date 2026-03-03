@@ -1,0 +1,246 @@
+---
+title: Virtual Machine Scripts
+description: Learn how to run VM creation scripts for virtual machines
+---
+
+VM scripts automate the creation and configuration of virtual machines on Proxmox VE. These scripts are ideal for operating systems and applications that require full virtualization.
+
+## Running VM Scripts
+
+<Steps>
+  <Step title="Access Proxmox Shell">
+    Open the Proxmox VE web interface and navigate to your node's Shell.
+  </Step>
+
+  <Step title="Execute the Script">
+    Run the script using bash with the curl command:
+
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/haos-vm.sh)"
+    ```
+  </Step>
+
+  <Step title="Configure VM Options">
+    The script will prompt you to configure:
+    - VM ID
+    - VM name/hostname
+    - Disk size
+    - CPU cores
+    - RAM allocation
+    - Network bridge
+    - MAC address
+    - Storage location
+  </Step>
+
+  <Step title="Wait for Download and Creation">
+    The script will:
+    - Download the OS image or disk
+    - Create the virtual machine
+    - Configure hardware settings
+    - Import the disk image
+    - Set boot order
+    - Start the VM (optional)
+  </Step>
+</Steps>
+
+## Available VM Scripts
+
+VM scripts are located in the `vm/` directory:
+
+<CodeGroup>
+```bash Home Assistant OS
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/haos-vm.sh)"
+```
+
+```bash Ubuntu 24.04
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/ubuntu2404-vm.sh)"
+```
+
+```bash Debian 13
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/debian-13-vm.sh)"
+```
+
+```bash Docker VM
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/docker-vm.sh)"
+```
+
+```bash OpenWrt
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/openwrt-vm.sh)"
+```
+
+```bash OPNsense
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/opnsense-vm.sh)"
+```
+</CodeGroup>
+
+## Complete VM Script List
+
+All available VM scripts:
+
+- `archlinux-vm.sh` - Arch Linux
+- `debian-vm.sh` - Debian 12
+- `debian-13-vm.sh` - Debian 13
+- `docker-vm.sh` - Docker VM
+- `haos-vm.sh` - Home Assistant OS
+- `mikrotik-routeros.sh` - MikroTik RouterOS
+- `nextcloud-vm.sh` - Nextcloud VM
+- `openwrt-vm.sh` - OpenWrt
+- `opnsense-vm.sh` - OPNsense
+- `owncloud-vm.sh` - ownCloud
+- `pimox-haos-vm.sh` - Home Assistant OS for Pi
+- `truenas-vm.sh` - TrueNAS
+- `ubuntu2204-vm.sh` - Ubuntu 22.04 LTS
+- `ubuntu2404-vm.sh` - Ubuntu 24.04 LTS
+- `ubuntu2504-vm.sh` - Ubuntu 25.04
+- `umbrel-os-vm.sh` - Umbrel OS
+
+## VM Script Features
+
+### Automatic Image Download
+
+VM scripts automatically download the latest official images:
+
+```bash
+# Home Assistant OS example
+# Downloads latest stable, beta, or dev version
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/haos-vm.sh)"
+```
+
+You'll be prompted to select the version channel (stable/beta/dev).
+
+### Hardware Configuration
+
+Scripts configure appropriate hardware settings:
+
+- **BIOS**: UEFI or SeaBIOS depending on the OS
+- **Machine Type**: q35 or i440fx
+- **SCSI Controller**: VirtIO SCSI or other as needed
+- **Network**: VirtIO network adapter
+- **Display**: VGA, Serial, or SPICE
+
+### Storage Options
+
+Choose where to store the VM disk:
+
+```bash
+# The script will detect available storage and prompt:
+# - local-lvm
+# - local-zfs
+# - ceph
+# - nfs
+# - etc.
+```
+
+<Note>
+VM disks are typically stored as qcow2 or raw images depending on your storage backend.
+</Note>
+
+## Customizing VM Creation
+
+### Pre-set Variables
+
+Some VM scripts accept environment variables:
+
+```bash
+# Set disk size before running
+export DISK_SIZE="64G"
+
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/haos-vm.sh)"
+```
+
+### Post-Creation Configuration
+
+After VM creation, you may need to:
+
+1. Start the VM from Proxmox web UI
+2. Access the console to complete OS setup
+3. Configure network settings
+4. Install additional software
+
+## VM vs Container
+
+When to use a VM script instead of a container script:
+
+| Use VM When | Use Container When |
+|-------------|--------------------|
+| Need full OS isolation | Want lightweight deployment |
+| Require kernel modules | App runs in user space |
+| Need different OS kernel | Debian/Ubuntu base is fine |
+| Hardware passthrough needed | Don't need PCI devices |
+| Running Windows/BSD | Running Linux apps |
+
+<Tip>
+Containers use less resources and start faster, but VMs provide complete isolation and flexibility.
+</Tip>
+
+## Example: Home Assistant OS
+
+The Home Assistant OS VM script demonstrates advanced features:
+
+```bash
+#!/usr/bin/env bash
+# Downloads the latest HAOS image from official repository
+# Supports stable, beta, and dev channels
+# Configures UEFI, VirtIO, and optimal settings
+# Generates random MAC address
+# Sets up 32GB disk by default
+
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/haos-vm.sh)"
+```
+
+The script:
+
+1. Detects available storage
+2. Downloads the latest HAOS qcow2 image
+3. Creates a VM with optimal settings
+4. Imports the disk
+5. Configures boot order
+6. Provides access information
+
+<Warning>
+VM creation requires sufficient disk space for the image download and VM disk. Check available storage before running.
+</Warning>
+
+## Troubleshooting
+
+### VM Won't Start
+
+Check the VM hardware settings:
+
+```bash
+# View VM configuration
+qm config <vmid>
+
+# Check boot order
+qm config <vmid> | grep boot
+```
+
+### Network Not Working
+
+Verify the network bridge exists:
+
+```bash
+# List bridges
+ip link show type bridge
+
+# Common bridges: vmbr0, vmbr1
+```
+
+### Insufficient Storage
+
+Check available space before creating VMs:
+
+```bash
+# Check storage
+pvesm status
+
+# Free up space if needed
+qm destroy <old-vmid>
+```
+
+## Next Steps
+
+- Configure VM backups in Proxmox VE
+- Set up snapshots for easy rollback
+- Configure cloud-init for automated setup (on supported VMs)
+- Add VMs to High Availability groups

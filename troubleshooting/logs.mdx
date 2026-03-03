@@ -1,0 +1,473 @@
+---
+title: Logs
+description: Understanding log files, their locations, and how to read them for troubleshooting
+---
+
+## Overview
+
+The Proxmox VE Helper Scripts generate detailed logs throughout container creation and installation processes. Understanding where logs are stored and how to read them is essential for troubleshooting issues.
+
+## Log File Locations
+
+### Default Log Locations (Without Debug Mode)
+
+<AccordionGroup>
+  <Accordion title="Host-Side Logs">
+    **Location:** `/tmp/create-lxc-<SESSION_ID>.log`
+
+    **Contains:**
+    - Container creation process
+    - Template download and verification
+    - Network configuration
+    - Initial container setup
+
+    **Example:**
+    ```bash
+    # View creation log
+    tail -n 50 /tmp/create-lxc-*.log
+    
+    # Find latest log
+    ls -lt /tmp/create-lxc-*.log | head -1
+    ```
+  </Accordion>
+
+  <Accordion title="Container Installation Logs">
+    **Temporary Location (during install):** `/root/.install-<SESSION_ID>.log` (inside container)
+
+    **Copied to Host on Failure:** `/tmp/install-lxc-<CTID>-<SESSION_ID>.log`
+
+    **Contains:**
+    - Package installations
+    - Application setup
+    - Database configurations
+    - Service startup
+    - All commands executed inside the container
+
+    **Example:**
+    ```bash
+    # View installation log (after failure)
+    tail -n 50 /tmp/install-lxc-*-*.log
+    
+    # While installation is running, enter container:
+    pct enter <CTID>
+    tail -f /root/.install-*.log
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Persistent Logs (With Debug Mode)
+
+When using `dev_mode="logs"`, logs are saved permanently to `/var/log/community-scripts/`.
+
+<Accordion title="Persistent Log Locations">
+  **Host Creation Log:**
+  `/var/log/community-scripts/create-lxc-<SESSION_ID>-<TIMESTAMP>.log`
+
+  **Container Installation Log:**
+  `/var/log/community-scripts/install-<SESSION_ID>-<TIMESTAMP>.log`
+
+  **Format:**
+  - SESSION_ID: Unique identifier (e.g., `abc12345`)
+  - TIMESTAMP: Date and time (e.g., `20251117_143022`)
+
+  **Example:**
+  ```bash
+  # Enable persistent logging
+  export dev_mode="logs"
+  bash -c "$(curl ...)"
+  
+  # View logs
+  ls -lh /var/log/community-scripts/
+  tail -f /var/log/community-scripts/install-*.log
+  ```
+
+  <Note>
+    Persistent logs are kept even after successful installations, making them ideal for CI/CD and post-mortem analysis.
+  </Note>
+</Accordion>
+
+## Log Types and Contents
+
+### Creation Log (create-lxc-*.log)
+
+**Contains:**
+- Script initialization
+- Template selection and validation
+- Template download (if needed)
+- Container creation (`pct create` command)
+- Network setup
+- Storage allocation
+- Initial container start
+
+**Example Log Entries:**
+```
+[2025-11-17 14:30:15] Starting container creation
+[2025-11-17 14:30:16] Template: debian-13-standard_13.1-1_amd64.tar.zst
+[2025-11-17 14:30:17] Storage: local-lvm
+[2025-11-17 14:30:18] CTID: 107
+[2025-11-17 14:30:20] Network: vmbr0, DHCP
+[2025-11-17 14:30:25] Container 107 created successfully
+```
+
+### Installation Log (install-*.log)
+
+**Contains:**
+- OS updates (`apt update`, `apt upgrade`)
+- Package installations
+- Application downloads and extractions
+- Configuration file modifications
+- Database setup and migrations
+- Service configuration and startup
+- Final cleanup and validation
+
+**Example Log Entries:**
+```
+[2025-11-17 14:31:00] Updating Container OS
+[2025-11-17 14:31:15] Installing Dependencies
+[2025-11-17 14:31:45] Downloading Wallabag v2.6.9
+[2025-11-17 14:32:10] Configuring Database
+[2025-11-17 14:32:25] Running Database Migrations
+[2025-11-17 14:32:40] Starting Services
+[2025-11-17 14:32:45] Installation Complete
+```
+
+### Error Log Entries
+
+When errors occur, logs include:
+- Exit code and explanation
+- Command that failed
+- Line number in script
+- Last 20 lines of execution context
+
+**Example Error Entry:**
+```
+[ERROR] in line 245: exit code 100 (APT: Package manager error): 
+while executing command apt-get install -y wallabag
+--- Last 20 lines of log ---
+...
+E: Unable to locate package wallabag
+E: Failed to fetch http://deb.debian.org/debian/...
+```
+
+## Reading and Analyzing Logs
+
+### Real-Time Monitoring
+
+<CodeGroup>
+```bash Tail Logs in Real-Time
+# Monitor creation log
+tail -f /tmp/create-lxc-*.log
+
+# Monitor installation log (from inside container)
+pct enter <CTID>
+tail -f /root/.install-*.log
+
+# Monitor persistent logs
+tail -f /var/log/community-scripts/*.log
+```
+
+```bash Watch Multiple Logs
+# Install multitail if needed
+apt-get install multitail
+
+# Monitor multiple logs simultaneously
+multitail /tmp/create-lxc-*.log /tmp/install-*.log
+```
+</CodeGroup>
+
+### Searching Logs
+
+<CodeGroup>
+```bash Search for Errors
+# Find all error messages
+grep -i "error" /var/log/community-scripts/*.log
+
+# Find specific exit codes
+grep "exit code [1-9]" /var/log/community-scripts/*.log
+
+# Find failures
+grep -i "fail" /tmp/create-lxc-*.log
+```
+
+```bash Search for Specific Steps
+# Find database-related entries
+grep -i "database\|mysql\|postgres" /tmp/install-*.log
+
+# Find network configuration
+grep -i "network\|dhcp\|ip" /tmp/create-lxc-*.log
+
+# Find service startup
+grep -i "systemctl\|service" /tmp/install-*.log
+```
+
+```bash Context Search
+# Show 5 lines before and after error
+grep -B 5 -A 5 "ERROR" /tmp/install-*.log
+
+# Show 10 lines after "Installing Dependencies"
+grep -A 10 "Installing Dependencies" /tmp/install-*.log
+```
+</CodeGroup>
+
+### Log Analysis Commands
+
+<CodeGroup>
+```bash Extract Timeline
+# Show timestamps and major steps
+grep "msg_info\|msg_ok\|msg_error" /var/log/community-scripts/*.log
+
+# Calculate installation duration
+HEAD_TIME=$(head -1 /tmp/install-*.log | cut -d']' -f1 | cut -d'[' -f2)
+TAIL_TIME=$(tail -1 /tmp/install-*.log | cut -d']' -f1 | cut -d'[' -f2)
+echo "Start: $HEAD_TIME"
+echo "End: $TAIL_TIME"
+```
+
+```bash Find Performance Bottlenecks
+# Find long-running commands (if timestamps present)
+grep -E "^\[.*\]" /tmp/install-*.log | \
+  awk '{print $1, $2}' | \
+  sort
+
+# Find package installation times
+grep "Installing" /tmp/install-*.log
+```
+
+```bash Extract Configuration Details
+# Find container configuration
+grep -E "CTID|memory|cores|storage" /tmp/create-lxc-*.log
+
+# Find network configuration
+grep -E "IP|gateway|bridge" /tmp/create-lxc-*.log
+```
+</CodeGroup>
+
+## Common Log Patterns
+
+### Successful Installation
+
+```
+⏳ Creating LXC container
+✔ Created LXC container (107)
+⏳ Starting LXC container
+✔ Started LXC container
+⏳ Setting up Container OS
+✔ Set up Container OS
+⏳ Updating Container OS
+✔ Updated Container OS
+⏳ Installing Dependencies
+✔ Installed Dependencies
+...
+✔ Completed Successfully!
+```
+
+### Failed Installation
+
+```
+⏳ Installing Dependencies
+[ERROR] in line 156: exit code 100 (APT: Package manager error)
+while executing command apt-get install -y curl wget
+--- Last 20 lines of log ---
+...
+E: Unable to fetch some archives
+```
+
+### Network Issues
+
+```
+⏳ Downloading template
+[ERROR] in line 89: exit code 222 (Template download failed)
+while executing command pveam download local debian-13-standard
+--- Last 20 lines of log ---
+...
+failed to download template
+no route to host
+```
+
+### Permission Issues
+
+```
+⏳ Creating directories
+[ERROR] in line 203: exit code 1 (General error / Operation not permitted)
+while executing command mkdir -p /opt/app
+--- Last 20 lines of log ---
+...
+mkdir: cannot create directory '/opt/app': Permission denied
+```
+
+## Log Retention and Cleanup
+
+### Automatic Cleanup
+
+**Temporary Logs (`/tmp/`):**
+- Automatically cleaned on system reboot
+- Removed after successful installation (installation logs only)
+- Preserved on failure for debugging
+
+**Persistent Logs (`/var/log/community-scripts/`):**
+- Never automatically deleted
+- Must be manually cleaned or archived
+
+### Manual Cleanup
+
+<CodeGroup>
+```bash Clean Old Temporary Logs
+# Remove logs older than 7 days
+find /tmp -name "create-lxc-*.log" -mtime +7 -delete
+find /tmp -name "install-lxc-*.log" -mtime +7 -delete
+```
+
+```bash Archive Persistent Logs
+# Create monthly archive
+tar czf ~/logs-archive-$(date +%Y%m).tar.gz \
+  /var/log/community-scripts/
+
+# Remove archived logs
+rm /var/log/community-scripts/*
+```
+
+```bash Clean by Size
+# Remove logs larger than 100MB
+find /var/log/community-scripts -size +100M -delete
+
+# Keep only last 50 logs
+cd /var/log/community-scripts
+ls -t | tail -n +51 | xargs rm -f
+```
+</CodeGroup>
+
+## Advanced Log Features
+
+### Trace Mode Logs
+
+When using `dev_mode="trace"`, logs include bash execution traces:
+
+```bash
++(/opt/app/install.sh): cd /opt/app
++(/opt/app/install.sh): curl -sL https://example.com/app.tar.gz
++(/opt/app/install.sh): tar xzf app.tar.gz
++(/opt/app/install.sh): ./configure --prefix=/usr/local
++(/opt/app/install.sh): make
++(/opt/app/install.sh): make install
+```
+
+**Find trace entries:**
+```bash
+# Extract only trace lines
+grep "^+" /var/log/community-scripts/install-*.log
+
+# Find specific command traces
+grep "^+.*curl" /var/log/community-scripts/install-*.log
+```
+
+<Warning>
+  Trace logs may contain sensitive information like passwords. Handle with care.
+</Warning>
+
+### Session Correlation
+
+Each installation has a unique SESSION_ID that links creation and installation logs:
+
+```bash
+# Find session ID from creation log
+SESSION_ID=$(grep -oP 'SESSION_ID=\K[a-z0-9]+' /tmp/create-lxc-*.log | head -1)
+
+# Find all logs for this session
+grep -l "$SESSION_ID" /var/log/community-scripts/*.log
+
+# View complete session timeline
+grep "$SESSION_ID" /var/log/community-scripts/*.log | sort
+```
+
+## Exporting Logs for Support
+
+### Creating Debug Packages
+
+```bash
+# Collect all relevant logs and system info
+export dev_mode="logs"
+bash -c "$(curl ...)"
+
+# After failure, create debug package
+DEBUG_PKG="debug-$(date +%Y%m%d-%H%M%S).tar.gz"
+tar czf "$DEBUG_PKG" \
+  /var/log/community-scripts/ \
+  /tmp/create-lxc-*.log \
+  /tmp/install-*.log \
+  /etc/pve/lxc/<CTID>.conf
+
+# Include system info
+pvecm status > /tmp/cluster-status.txt 2>&1
+pvesm status > /tmp/storage-status.txt 2>&1
+pveversion > /tmp/pve-version.txt 2>&1
+
+tar czf "$DEBUG_PKG" --append \
+  /tmp/cluster-status.txt \
+  /tmp/storage-status.txt \
+  /tmp/pve-version.txt
+
+echo "Debug package created: $DEBUG_PKG"
+```
+
+### Sanitizing Logs
+
+Before sharing logs, remove sensitive information:
+
+```bash
+# Create sanitized copy
+cp /tmp/install-lxc-107-abc.log /tmp/install-sanitized.log
+
+# Remove passwords (basic pattern)
+sed -i 's/password=[^ ]*/password=REDACTED/g' /tmp/install-sanitized.log
+sed -i 's/PASSWORD=[^ ]*/PASSWORD=REDACTED/g' /tmp/install-sanitized.log
+
+# Remove IP addresses (optional)
+sed -i 's/[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}/X.X.X.X/g' /tmp/install-sanitized.log
+
+# Remove hostnames (optional)
+sed -i 's/host=[^ ]*/host=REDACTED/g' /tmp/install-sanitized.log
+```
+
+<Warning>
+  Always review sanitized logs manually before sharing. Automated sanitization may miss sensitive data.
+</Warning>
+
+## Best Practices
+
+### During Development
+
+1. **Always enable persistent logs:**
+   ```bash
+   export dev_mode="logs"
+   ```
+
+2. **Use verbose mode for detailed output:**
+   ```bash
+   export var_verbose="yes"
+   ```
+
+3. **Monitor logs in real-time:**
+   ```bash
+   tail -f /var/log/community-scripts/*.log
+   ```
+
+### For Production
+
+1. **Keep creation logs for audit trail**
+2. **Archive logs monthly**
+3. **Monitor log disk usage**
+4. **Set up log rotation if needed**
+
+### For Troubleshooting
+
+1. **Check exit codes first** - See [Exit Codes](/troubleshooting/exit-codes)
+2. **Read last 50 lines of logs** - Most errors appear at the end
+3. **Search for "ERROR" and "exit code"** - Quickly find failures
+4. **Enable trace mode for deep debugging** - See [Debug Mode](/troubleshooting/debug-mode)
+5. **Correlate creation and installation logs** - Use SESSION_ID
+
+## See Also
+
+- [Exit Codes](/troubleshooting/exit-codes) - Understanding error codes in logs
+- [Debug Mode](/troubleshooting/debug-mode) - Enable detailed logging and tracing
+- [Common Issues](/troubleshooting/common-issues) - Frequently encountered log patterns

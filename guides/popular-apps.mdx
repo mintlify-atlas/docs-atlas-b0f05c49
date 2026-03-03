@@ -1,0 +1,272 @@
+---
+title: Popular Applications
+description: Quick start guide for the most popular applications available in Proxmox VE Helper Scripts
+---
+
+This guide covers the most popular applications you can deploy using Proxmox VE Helper Scripts. Each application is available as a pre-configured LXC container or VM.
+
+## Media Servers
+
+### Plex Media Server
+
+Plex is a powerful media server that organizes your videos, music, and photos for easy streaming.
+
+<Steps>
+  <Step title="Run the Plex Script">
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/plex.sh)"
+    ```
+  </Step>
+  
+  <Step title="Configure Resources">
+    Default resources:
+    - **CPU:** 2 cores
+    - **RAM:** 2048 MB
+    - **Disk:** 8 GB
+    - **OS:** Ubuntu 24.04
+  </Step>
+  
+  <Step title="Access Plex">
+    After installation completes, access Plex at:
+    ```
+    http://<container-ip>:32400/web
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+Plex supports GPU hardware acceleration. The script automatically enables GPU passthrough if available.
+</Tip>
+
+### Jellyfin
+
+Jellyfin is a free and open-source media server alternative to Plex.
+
+<Steps>
+  <Step title="Run the Jellyfin Script">
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/jellyfin.sh)"
+    ```
+  </Step>
+  
+  <Step title="Configure Resources">
+    Default resources:
+    - **CPU:** 2 cores
+    - **RAM:** 2048 MB
+    - **Disk:** 16 GB
+    - **OS:** Ubuntu 24.04
+  </Step>
+  
+  <Step title="Access Jellyfin">
+    Access Jellyfin at:
+    ```
+    http://<container-ip>:8096
+    ```
+  </Step>
+</Steps>
+
+<Note>
+Jellyfin includes Intel GPU dependencies for hardware transcoding on supported hardware.
+</Note>
+
+## Network & DNS
+
+### Pi-hole
+
+Pi-hole is a network-wide ad blocker that acts as a DNS sinkhole.
+
+<Steps>
+  <Step title="Run the Pi-hole Script">
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/pihole.sh)"
+    ```
+  </Step>
+  
+  <Step title="Configure Resources">
+    Default resources:
+    - **CPU:** 1 core
+    - **RAM:** 512 MB
+    - **Disk:** 2 GB
+    - **OS:** Debian 13
+  </Step>
+  
+  <Step title="Access Pi-hole Admin">
+    Access the web interface at:
+    ```
+    http://<container-ip>/admin
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+After installation, configure your router or devices to use Pi-hole as their DNS server.
+</Warning>
+
+### AdGuard Home
+
+AdGuard Home is a network-wide software for blocking ads & tracking.
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/adguard.sh)"
+```
+
+**Default Resources:**
+- CPU: 1 core
+- RAM: 512 MB
+- Disk: 2 GB
+
+### Nginx Proxy Manager
+
+Easily manage reverse proxies with SSL certificates.
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/nginxproxymanager.sh)"
+```
+
+## Cloud Storage & Photos
+
+### Nextcloud (Alpine)
+
+Nextcloud provides file hosting and collaboration tools.
+
+<Steps>
+  <Step title="Run the Alpine Nextcloud Script">
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/alpine-nextcloud.sh)"
+    ```
+  </Step>
+  
+  <Step title="Benefits of Alpine">
+    The Alpine version uses minimal resources:
+    - Smaller container size
+    - Lower memory footprint
+    - Faster deployment
+  </Step>
+</Steps>
+
+### Immich
+
+Self-hosted photo and video backup solution.
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/immich.sh)"
+```
+
+<Tip>
+Immich is perfect for backing up photos from mobile devices, similar to Google Photos.
+</Tip>
+
+### PhotoPrism
+
+AI-powered photo management application.
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/photoprism.sh)"
+```
+
+## Dashboard & Management
+
+### Heimdall Dashboard
+
+Organize all your web applications in one place.
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/heimdall-dashboard.sh)"
+```
+
+<Note>
+Heimdall is great as a starting point for organizing links to all your other applications.
+</Note>
+
+## Resource Comparison
+
+<CardGroup cols={2}>
+  <Card title="Lightweight Apps" icon="feather">
+    **Under 1 GB RAM:**
+    - Pi-hole (512 MB)
+    - AdGuard Home (512 MB)
+    - Alpine-based apps (256-512 MB)
+  </Card>
+  
+  <Card title="Resource-Intensive Apps" icon="server">
+    **2+ GB RAM:**
+    - Plex (2048 MB)
+    - Jellyfin (2048 MB)
+    - PhotoPrism (2048 MB)
+    - Immich (2048 MB)
+  </Card>
+</CardGroup>
+
+## Installation Tips
+
+<Steps>
+  <Step title="Always Use Latest Scripts">
+    The scripts are continuously updated. Always download fresh from the repository.
+  </Step>
+  
+  <Step title="Check System Requirements">
+    Ensure your Proxmox host has sufficient:
+    - Available RAM
+    - Storage space
+    - Network configuration
+  </Step>
+  
+  <Step title="Plan Your Network">
+    Consider:
+    - Static IP assignments
+    - DNS configuration
+    - Firewall rules
+    - Reverse proxy setup
+  </Step>
+  
+  <Step title="Backup Configuration">
+    After configuring an application, create a backup:
+    ```bash
+    vzdump <CTID> --mode snapshot --compress zstd
+    ```
+  </Step>
+</Steps>
+
+## Alpine vs Standard Containers
+
+Many applications are available in both standard and Alpine Linux versions:
+
+| Feature | Standard (Debian/Ubuntu) | Alpine Linux |
+|---------|-------------------------|---------------|
+| **Size** | Larger (300+ MB) | Smaller (50-100 MB) |
+| **RAM** | Higher baseline | Lower baseline |
+| **Compatibility** | Broader package support | Minimal packages |
+| **Security** | Regular updates | Minimal attack surface |
+| **Use Case** | Complex applications | Simple services |
+
+<Tip>
+Choose Alpine versions for:
+- Resource-constrained environments
+- Simple services (databases, proxies)
+- Multiple instances of the same app
+
+Choose standard versions for:
+- Applications requiring specific packages
+- GPU acceleration needs
+- Maximum compatibility
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Setup" icon="docker" href="/guides/docker-setup">
+    Learn how to set up Docker for running containerized applications
+  </Card>
+  
+  <Card title="Home Assistant" icon="home" href="/guides/home-assistant">
+    Complete guide for installing Home Assistant OS
+  </Card>
+  
+  <Card title="Networking" icon="network-wired" href="/guides/networking">
+    Configure networking for your containers
+  </Card>
+  
+  <Card title="Security" icon="shield" href="/guides/security-hardening">
+    Harden your Proxmox containers and VMs
+  </Card>
+</CardGroup>

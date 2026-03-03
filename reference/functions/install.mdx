@@ -1,0 +1,429 @@
+---
+title: Install Functions
+description: Container installation and setup functions for Proxmox VE LXC containers
+---
+
+The `install.func` library provides installation functions executed inside LXC containers after creation. It handles network connectivity verification, OS updates, package installation, DNS resolution checks, MOTD configuration, and container customization.
+
+## Initialization
+
+### Automatic Setup
+
+The install functions are automatically loaded when the installation script runs inside the container.
+
+```bash install.func:30-38
+if ! command -v curl >/dev/null 2>&1; then
+  printf "\r\e[2K%b" '\033[93m Setup Source \033[m' >&2
+  apt update >/dev/null 2>&1
+  apt install -y curl >/dev/null 2>&1
+fi
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/core.func)
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/error_handler.func)
+load_functions
+catch_errors
+```
+
+### post_progress_to_api()
+
+Lightweight progress ping from inside the container.
+
+<ParamField path="status" type="string" default="configuring">
+  Progress status: `configuring`, `validation`, or custom status
+</ParamField>
+
+```bash install.func:61-71
+post_progress_to_api() {
+  command -v curl &>/dev/null || return 0
+  [[ "${DIAGNOSTICS:-no}" == "no" ]] && return 0
+  [[ -z "${RANDOM_UUID:-}" ]] && return 0
+
+  local progress_status="${1:-configuring}"
+
+  curl -fsS -m 5 -X POST "https://telemetry.community-scripts.org/telemetry" \
+    -H "Content-Type: application/json" \
+    -d "{\"random_id\":\"${RANDOM_UUID}\",\"execution_id\":\"${EXECUTION_ID:-${RANDOM_UUID}}\",\"type\":\"lxc\",\"nsapp\":\"${app:-unknown}\",\"status\":\"${progress_status}\"}" &>/dev/null || true
+}
+```
+
+## Network & Connectivity
+
+### verb_ip6()
+
+Configures IPv6 based on IPV6_METHOD variable.
+
+<Accordion title="IPv6 Configuration">
+  If `IPV6_METHOD=disable`, this function disables IPv6 via sysctl to prevent issues with IPv6-incompatible services.
+</Accordion>
+
+```bash install.func:84-99
+verb_ip6() {
+  set_std_mode # Set STD mode based on VERBOSE
+
+  if [ "${IPV6_METHOD:-}" = "disable" ]; then
+    msg_info "Disabling IPv6 (this may affect some services)"
+    mkdir -p /etc/sysctl.d
+    $STD tee /etc/sysctl.d/99-disable-ipv6.conf >/dev/null <<EOF
+# Disable IPv6 (set by community-scripts)
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+EOF
+    $STD sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
+    msg_ok "Disabled IPv6"
+  fi
+}
+```
+
+### setting_up_container()
+
+Verifies network connectivity and prepares the container OS.
+
+<ParamField path="RETRY_NUM" type="number" default="30">
+  Number of retries for network connectivity check
+</ParamField>
+
+<ParamField path="RETRY_EVERY" type="number" default="2">
+  Seconds to wait between retries
+</ParamField>
+
+```bash install.func:110-137
+setting_up_container() {
+  msg_info "Setting up Container OS"
+
+  # Fix Debian 13 LXC template bug where / is owned by nobody
+  if [[ "$(stat -c '%U' /)" != "root" ]]; then
+    (chown root:root / 2>/dev/null) || true
+  fi
+
+  # Wait for network connectivity
+  for ((i = RETRY_NUM; i > 0; i--)); do
+    if [ "$(hostname -I)" != "" ]; then
+      break
+    fi
+    echo 1>&2 -en "${CROSS}${RD} No Network! "
+    sleep $RETRY_EVERY
+  done
+  if [ "$(hostname -I)" = "" ]; then
+    echo 1>&2 -e "\n${CROSS}${RD} No Network After $RETRY_NUM Tries${CL}"
+    echo -e "${NETWORK}Check Network Settings"
+    exit 121
+  fi
+  
+  # Remove Python EXTERNALLY-MANAGED restrictions
+  rm -rf /usr/lib/python3.*/EXTERNALLY-MANAGED
+  
+  # Disable systemd-networkd-wait-online for faster boot
+  systemctl disable -q --now systemd-networkd-wait-online.service
+  
+  msg_ok "Set up Container OS"
+  msg_ok "Network Connected: ${BL}$(hostname -I)"
+  post_progress_to_api
+}
+```
+
+### network_check()
+
+Comprehensive network connectivity check for IPv4 and IPv6.
+
+<Accordion title="DNS Servers Tested">
+  **IPv4:**
+  - 1.1.1.1 (Cloudflare)
+  - 8.8.8.8 (Google)
+  - 9.9.9.9 (Quad9)
+
+  **IPv6:**
+  - 2606:4700:4700::1111 (Cloudflare)
+  - 2001:4860:4860::8888 (Google)
+  - 2620:fe::fe (Quad9)
+</Accordion>
+
+```bash install.func:150-207
+network_check() {
+  set +e
+  trap - ERR
+  ipv4_connected=false
+  ipv6_connected=false
+  sleep 1
+
+  # Check IPv4 connectivity to DNS servers
+  if ping -c 1 -W 1 1.1.1.1 &>/dev/null || ping -c 1 -W 1 8.8.8.8 &>/dev/null || ping -c 1 -W 1 9.9.9.9 &>/dev/null; then
+    msg_ok "IPv4 Internet Connected"
+    ipv4_connected=true
+  else
+    msg_error "IPv4 Internet Not Connected"
+  fi
+
+  # Check IPv6 connectivity to DNS servers
+  if ping6 -c 1 -W 1 2606:4700:4700::1111 &>/dev/null || ping6 -c 1 -W 1 2001:4860:4860::8888 &>/dev/null || ping6 -c 1 -W 1 2620:fe::fe &>/dev/null; then
+    msg_ok "IPv6 Internet Connected"
+    ipv6_connected=true
+  else
+    msg_error "IPv6 Internet Not Connected"
+  fi
+
+  # If both checks fail, prompt user
+  if [[ $ipv4_connected == false && $ipv6_connected == false ]]; then
+    read -r -p "No Internet detected, would you like to continue anyway? <y/N> " prompt
+    if [[ "${prompt,,}" =~ ^(y|yes)$ ]]; then
+      echo -e "${INFO}${RD}Expect Issues Without Internet${CL}"
+    else
+      echo -e "${NETWORK}Check Network Settings"
+      exit 122
+    fi
+  fi
+
+  # DNS resolution checks for GitHub-related domains
+  GIT_HOSTS=("github.com" "raw.githubusercontent.com" "api.github.com" "git.community-scripts.org")
+  GIT_STATUS="Git DNS:"
+  DNS_FAILED=false
+
+  for HOST in "${GIT_HOSTS[@]}"; do
+    RESOLVEDIP=$(getent hosts "$HOST" | awk '{ print $1 }' | grep -E '(^([0-9]{1,3}\.){3}[0-9]{1,3}$)|(^[a-fA-F0-9:]+$)' | head -n1)
+    if [[ -z "$RESOLVEDIP" ]]; then
+      GIT_STATUS+="$HOST:($DNSFAIL)"
+      DNS_FAILED=true
+    else
+      GIT_STATUS+="$HOST:($DNSOK)"
+    fi
+  done
+
+  if [[ "$DNS_FAILED" == true ]]; then
+    fatal "$GIT_STATUS"
+  else
+    msg_ok "$GIT_STATUS"
+  fi
+
+  set -e
+  trap 'error_handler' ERR
+}
+```
+
+## OS Update & Package Management
+
+### update_os()
+
+Updates container OS and configures APT cacher if enabled.
+
+<ParamField path="CACHER" type="string" default="no">
+  Enable APT cacher proxy: `yes` or `no`
+</ParamField>
+
+<ParamField path="CACHER_IP" type="string">
+  APT cacher proxy IP address (required if CACHER=yes)
+</ParamField>
+
+```bash install.func:222-252
+update_os() {
+  msg_info "Updating Container OS"
+  
+  # Configure APT cacher proxy if enabled
+  if [[ "$CACHER" == "yes" ]]; then
+    echo 'Acquire::http::Proxy-Auto-Detect "/usr/local/bin/apt-proxy-detect.sh";' >/etc/apt/apt.conf.d/00aptproxy
+    cat <<EOF >/usr/local/bin/apt-proxy-detect.sh
+#!/bin/bash
+if nc -w1 -z "${CACHER_IP}" 3142; then
+  echo -n "http://${CACHER_IP}:3142"
+else
+  echo -n "DIRECT"
+fi
+EOF
+    chmod +x /usr/local/bin/apt-proxy-detect.sh
+  fi
+  
+  # Update and upgrade packages
+  apt_update_safe
+  $STD apt-get -o Dpkg::Options::="--force-confold" -y dist-upgrade
+  
+  # Remove Python EXTERNALLY-MANAGED restrictions
+  rm -rf /usr/lib/python3.*/EXTERNALLY-MANAGED
+  
+  msg_ok "Updated Container OS"
+  post_progress_to_api
+
+  # Load tools.func for additional utilities
+  local tools_content
+  tools_content=$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/tools.func) || {
+    msg_error "Failed to download tools.func"
+    exit 115
+  }
+  source /dev/stdin <<<"$tools_content"
+}
+```
+
+## MOTD & SSH Configuration
+
+### motd_ssh()
+
+Configures Message of the Day (MOTD) with container information.
+
+<ParamField path="APPLICATION" type="string" required>
+  Application name displayed in MOTD
+</ParamField>
+
+<ParamField path="SSH_ROOT" type="string" default="no">
+  Enable root SSH access: `yes` or `no`
+</ParamField>
+
+```bash install.func:272-293
+motd_ssh() {
+  # Set terminal to 256-color mode
+  grep -qxF "export TERM='xterm-256color'" /root/.bashrc || echo "export TERM='xterm-256color'" >>/root/.bashrc
+
+  # Create MOTD profile script
+  PROFILE_FILE="/etc/profile.d/00_lxc-details.sh"
+  echo "echo -e \"\"" >"$PROFILE_FILE"
+  echo -e "echo -e \"${BOLD}${APPLICATION} LLX Container${CL}\"" >>"$PROFILE_FILE"
+  echo -e "echo -e \"${TAB}${GATEWAY}${YW} Provided by: ${GN}community-scripts ORG ${YW}| GitHub: ${GN}https://github.com/community-scripts/ProxmoxVE${CL}\"" >>"$PROFILE_FILE"
+  echo "echo \"\"" >>"$PROFILE_FILE"
+  echo -e "echo -e \"${TAB}${OS}${YW} OS: ${GN}\$(grep ^NAME /etc/os-release | cut -d= -f2 | tr -d '\"') - Version: \$(grep ^VERSION_ID /etc/os-release | cut -d= -f2 | tr -d '\"')${CL}\"" >>"$PROFILE_FILE"
+  echo -e "echo -e \"${TAB}${HOSTNAME}${YW} Hostname: ${GN}\$(hostname)${CL}\"" >>"$PROFILE_FILE"
+  echo -e "echo -e \"${TAB}${INFO}${YW} IP Address: ${GN}\$(hostname -I | awk '{print \$1}')${CL}\"" >>"$PROFILE_FILE"
+
+  # Disable default MOTD scripts
+  chmod -x /etc/update-motd.d/*
+
+  # Enable root SSH if requested
+  if [[ "${SSH_ROOT}" == "yes" ]]; then
+    sed -i "s/#PermitRootLogin prohibit-password/PermitRootLogin yes/g" /etc/ssh/sshd_config
+    systemctl restart sshd
+  fi
+  
+  post_progress_to_api
+}
+```
+
+## Container Customization
+
+### customize()
+
+Customizes container for passwordless root login and creates update script.
+
+<ParamField path="PASSWORD" type="string">
+  Root password (if empty, enables auto-login)
+</ParamField>
+
+<ParamField path="SSH_AUTHORIZED_KEY" type="string">
+  SSH public key for root account
+</ParamField>
+
+```bash install.func:308-332
+customize() {
+  # Enable auto-login if no password set
+  if [[ "$PASSWORD" == "" ]]; then
+    msg_info "Customizing Container"
+    GETTY_OVERRIDE="/etc/systemd/system/container-getty@1.service.d/override.conf"
+    mkdir -p $(dirname $GETTY_OVERRIDE)
+    cat <<EOF >$GETTY_OVERRIDE
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud tty%I 115200,38400,9600 \$TERM
+EOF
+    systemctl daemon-reload
+    systemctl restart $(basename $(dirname $GETTY_OVERRIDE) | sed 's/\.d//')
+    msg_ok "Customized Container"
+  fi
+  
+  # Create update script
+  echo "bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/${app}.sh)\"" >/usr/bin/update
+  chmod +x /usr/bin/update
+
+  # Install SSH authorized keys
+  if [[ -n "${SSH_AUTHORIZED_KEY}" ]]; then
+    mkdir -p /root/.ssh
+    echo "${SSH_AUTHORIZED_KEY}" >/root/.ssh/authorized_keys
+    chmod 700 /root/.ssh
+    chmod 600 /root/.ssh/authorized_keys
+  fi
+  
+  post_progress_to_api
+}
+```
+
+## Usage Examples
+
+<CodeGroup>
+```bash Basic Installation Flow
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/install.func)
+
+# 1. Set up container OS and verify network
+setting_up_container
+network_check
+
+# 2. Update OS and install packages
+update_os
+
+# 3. Configure MOTD and SSH
+motd_ssh
+
+# 4. Customize container
+customize
+```
+
+```bash With APT Cacher
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/install.func)
+
+# Enable APT cacher
+export CACHER="yes"
+export CACHER_IP="192.168.1.10"
+
+# Run installation
+setting_up_container
+network_check
+update_os
+```
+
+```bash Disable IPv6
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/install.func)
+
+# Disable IPv6
+export IPV6_METHOD="disable"
+
+# Configure container
+verb_ip6
+setting_up_container
+```
+
+```bash Enable Root SSH
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/install.func)
+
+# Enable root SSH access
+export SSH_ROOT="yes"
+export SSH_AUTHORIZED_KEY="ssh-rsa AAAAB3NzaC1yc2E..."
+
+# Configure MOTD and SSH
+motd_ssh
+customize
+```
+</CodeGroup>
+
+## Error Codes
+
+<Accordion title="Network & Connectivity Errors">
+  - **121**: Container network not ready (no IP after retries)
+  - **122**: No internet connectivity (user declined to continue)
+  - **123**: Local IP detection failed
+</Accordion>
+
+<Accordion title="Download & Setup Errors">
+  - **115**: install.func download failed or incomplete
+  - **117**: Container did not reach running state
+  - **118**: No IP assigned to container after timeout
+</Accordion>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Build Functions" icon="hammer" href="./build">
+    LXC container build and configuration
+  </Card>
+  <Card title="Tools Functions" icon="wrench" href="./tools">
+    Package management and system utilities
+  </Card>
+  <Card title="API Functions" icon="chart-line" href="./api">
+    Telemetry and diagnostics API
+  </Card>
+</CardGroup>

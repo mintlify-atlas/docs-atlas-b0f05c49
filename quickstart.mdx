@@ -1,80 +1,381 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start Guide
+description: Install your first application with Proxmox VE Helper Scripts in under 5 minutes
 ---
 
-## Get started in three steps
+# Quick Start Guide
 
-Get your documentation site running locally and make your first customization.
+Get up and running with Proxmox VE Helper Scripts in under 5 minutes. This guide walks you through your first script installation using Docker as an example.
 
-### Step 1: Set up your local environment
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+Before starting, ensure you have:
+
+<Steps>
+  <Step title="Proxmox VE Installed">
+    A working Proxmox VE installation (version 8.4.x, 9.0.x, or 9.1.x)
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    <Tip>
+      New to Proxmox? Download it from [proxmox.com](https://www.proxmox.com/en/downloads)
+    </Tip>
+  </Step>
+  
+  <Step title="Internet Connection">
+    Your Proxmox host needs internet access to download scripts and packages
+  </Step>
+  
+  <Step title="Shell Access">
+    Access to the Proxmox shell via:
+    - The web UI (node → Shell button)
+    - SSH connection to your Proxmox host
+  </Step>
+</Steps>
+
+## Your First Installation: Docker
+
+We'll install Docker, a popular container platform, to demonstrate how simple the process is.
+
+### Step 1: Access Proxmox Shell
+
+<Steps>
+  <Step title="Via Web UI">
+    1. Open your Proxmox web interface at `https://YOUR_PROXMOX_IP:8006`
+    2. Log in with your credentials
+    3. In the left sidebar, click on your node name (e.g., `pve`)
+    4. Click the **Shell** button in the top-right corner
+  </Step>
+  
+  <Step title="Or Via SSH">
+    ```bash
+    ssh root@YOUR_PROXMOX_IP
+    ```
+  </Step>
+</Steps>
+
+### Step 2: Run the Docker Installation Script
+
+Copy and paste this command into the Proxmox shell:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)"
+```
+
+<Info>
+  **What does this command do?**
+  - `curl -fsSL` downloads the script from GitHub
+  - `bash -c` executes it immediately
+  - The script creates a container and installs Docker inside it
+</Info>
+
+### Step 3: Configure Installation
+
+The script will prompt you with configuration options:
+
+<CodeGroup>
+```bash Simple Mode (Recommended for Beginners)
+This will create a LXC Container using the default settings.
+
+Use Default Settings? [y/n]:
+→ Press 'y' and Enter
+
+# The script will use these defaults:
+# - Container ID: Next available (e.g., 100, 101, 102...)
+# - Hostname: docker
+# - Disk Size: 4 GB
+# - CPU Cores: 2
+# - RAM: 2048 MB
+# - Bridge: vmbr0
+# - IP Address: DHCP
+# - Container Type: Unprivileged
+```
+
+```bash Advanced Mode (For Experienced Users)
+Use Default Settings? [y/n]:
+→ Press 'n' and Enter
+
+# You'll be prompted for each setting:
+Container ID:
+→ 101
+
+Hostname:
+→ docker-home
+
+Disk Size in GB:
+→ 8
+
+CPU Core Count:
+→ 4
+
+RAM in MB:
+→ 4096
+
+# ... and more options
+```
+</CodeGroup>
+
+<Tip>
+  First time? Use simple mode (press 'y'). You can always adjust resources later in the Proxmox UI.
+</Tip>
+
+### Step 4: Wait for Installation
+
+The script will now:
+
+<Steps>
+  <Step title="Create the LXC Container">
+    Downloads the Debian 13 template if needed and creates the container
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    ```
+    ✓ Creating LXC container...
+    ```
+  </Step>
+  
+  <Step title="Start the Container">
+    Powers on the newly created container
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+    ```
+    ✓ Starting LXC container...
+    ```
+  </Step>
+  
+  <Step title="Install Docker">
+    Runs the install script inside the container to set up Docker
+    
+    ```
+    ✓ Setting up container...
+    ✓ Network check passed
+    ✓ Updating OS...
+    ✓ Installing Docker...
+    ```
+  </Step>
+</Steps>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Installation typically takes 2-5 minutes depending on your internet speed and server performance.
 </Note>
+
+### Step 5: Optional Add-ons
+
+During installation, you'll be asked:
+
+```bash
+Would you like to add Portainer (UI)? <y/N>
+```
+
+<Tip>
+  **Portainer** provides a web UI for managing Docker containers. Highly recommended for beginners!
+  
+  Press 'y' to install it.
+</Tip>
+
+If you decline Portainer, you'll be asked:
+
+```bash
+Would you like to install the Portainer Agent (for remote management)? <y/N>
+```
+
+The agent allows managing this Docker instance from a centralized Portainer server.
+
+### Step 6: Access Your Installation
+
+Once complete, you'll see:
+
+```bash
+✓ Completed successfully!
+
+Docker setup has been successfully initialized!
+If you installed Portainer, access it at the following URL:
+    https://YOUR_CONTAINER_IP:9443
+```
+
+<Steps>
+  <Step title="Find Your Container IP">
+    In the Proxmox web UI:
+    1. Click on your container (e.g., `101 (docker)`)
+    2. Go to **Summary** tab
+    3. Look for the IP address
+    
+    Or in the shell:
+    ```bash
+    pct exec 101 -- hostname -I
+    ```
+  </Step>
+  
+  <Step title="Access Portainer">
+    Open your browser and go to:
+    ```
+    https://YOUR_CONTAINER_IP:9443
+    ```
+    
+    Create your admin account on first login.
+  </Step>
+  
+  <Step title="Start Using Docker">
+    SSH into the container or use the Proxmox console:
+    ```bash
+    pct enter 101
+    docker ps
+    docker run hello-world
+    ```
+  </Step>
+</Steps>
+
+## What You Just Did
+
+Congratulations! You just:
+
+<CardGroup cols={2}>
+  <Card title="Created an LXC Container" icon="box">
+    A lightweight container running Debian 13
+  </Card>
+  <Card title="Installed Docker" icon="docker">
+    The latest Docker Engine with Compose and Buildx
+  </Card>
+  <Card title="Set Up Portainer (Optional)" icon="chart-line">
+    A web UI for managing your Docker containers
+  </Card>
+  <Card title="Automated Everything" icon="wand-magic-sparkles">
+    All in one command, under 5 minutes
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+### Try More Applications
+
+Visit [helper-scripts.com](https://helper-scripts.com) to browse 200+ available scripts:
+
+<CardGroup cols={2}>
+  <Card title="Home Automation" icon="house">
+    Home Assistant, ESPHome, Node-RED
+  </Card>
+  <Card title="Media Servers" icon="film">
+    Plex, Jellyfin, Emby, Radarr, Sonarr
+  </Card>
+  <Card title="Network Tools" icon="network-wired">
+    AdGuard, Pi-hole, WireGuard, Nginx
+  </Card>
+  <Card title="Development" icon="code">
+    GitLab, Gitea, VS Code Server
+  </Card>
+</CardGroup>
+
+### Update Your Container
+
+To update Docker in the future:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)" -s update
+```
+
+<Info>
+  The `update` command updates both Docker and Portainer to the latest versions.
+</Info>
+
+### Manage Your Container
+
+<Tip>
+  **Common Container Management Commands:**
+  
+  ```bash
+  # Start container
+  pct start 101
+  
+  # Stop container
+  pct stop 101
+  
+  # Enter container shell
+  pct enter 101
+  
+  # View container status
+  pct status 101
+  
+  # Delete container (careful!)
+  pct destroy 101
+  ```
+</Tip>
+
+## Installation Pattern for Other Scripts
+
+All scripts follow the same pattern:
+
+```bash
+# General format:
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/SCRIPT_NAME.sh)"
+
+# Examples:
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/adguard.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/homeassistant.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/nginx-proxy-manager.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/uptimekuma.sh)"
+```
+
+<Note>
+  Script names are lowercase with hyphens. Check [helper-scripts.com](https://helper-scripts.com) for the exact command.
+</Note>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Script fails with 'command not found'">
+    Make sure you're running the command from your **Proxmox host shell**, not inside an existing container.
+    
+    Also ensure `curl` is installed:
+    ```bash
+    apt update && apt install -y curl
+    ```
+  </Accordion>
+  
+  <Accordion title="Container creation fails">
+    Check available disk space:
+    ```bash
+    df -h
+    ```
+    
+    Ensure your storage has enough free space for container templates and containers.
+  </Accordion>
+  
+  <Accordion title="Network/internet issues inside container">
+    Verify Proxmox network configuration:
+    ```bash
+    ip a
+    ping -c 4 8.8.8.8
+    ```
+    
+    Check that your bridge (vmbr0) is properly configured in Proxmox.
+  </Accordion>
+  
+  <Accordion title="Can't access Portainer web UI">
+    1. Verify the container is running: `pct status 101`
+    2. Check the container's IP: `pct exec 101 -- hostname -I`
+    3. Ensure port 9443 is not blocked by a firewall
+    4. Try accessing via IP shown in the success message
+  </Accordion>
+</AccordionGroup>
+
+## Get Help
+
+If you run into issues:
+
+<CardGroup cols={3}>
+  <Card title="Discord Community" icon="discord" href="https://discord.gg/3AnUqsXnmK">
+    Ask questions in real-time
+  </Card>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/community-scripts/ProxmoxVE/discussions">
+    Browse Q&A and community tips
+  </Card>
+  <Card title="Report Issues" icon="bug" href="https://github.com/community-scripts/ProxmoxVE/issues">
+    File bug reports if needed
+  </Card>
+</CardGroup>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Learn Installation Methods" icon="book" href="/getting-started/installation-methods">
+    Discover all the ways to use these scripts
+  </Card>
+  <Card title="Browse All Scripts" icon="grid" href="https://helper-scripts.com">
+    Explore 200+ available applications
+  </Card>
+</CardGroup>

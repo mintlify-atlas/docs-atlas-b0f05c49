@@ -1,0 +1,703 @@
+---
+title: Creating Install Scripts
+description: Learn how to write in-container installation scripts for the install/ directory
+---
+
+Installation scripts (`install/AppName-install.sh`) run inside LXC containers and are responsible for setting up the OS, installing dependencies, configuring applications, and creating systemd services.
+
+## Overview
+
+### Purpose
+
+Installation scripts handle:
+
+1. Setting up the container OS (updates, packages)
+2. Installing application dependencies
+3. Downloading and configuring the application
+4. Setting up services and systemd units
+5. Creating version tracking files for updates
+6. Generating credentials/configurations
+7. Final cleanup and validation
+
+### Execution Flow
+
+```
+ct/AppName.sh (Proxmox Host)
+       ↓
+build_container()
+       ↓
+pct exec CTID bash -c "$(cat install/AppName-install.sh)"
+       ↓
+install/AppName-install.sh (Inside Container)
+       ↓
+Container Ready with App Installed
+```
+
+## Environment Variables
+
+The following variables are automatically available inside install scripts:
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `CTID` | Container ID | `100`, `101` |
+| `PCT_OSTYPE` | OS type | `alpine`, `debian`, `ubuntu` |
+| `HOSTNAME` | Container hostname | `pihole` |
+| `FUNCTIONS_FILE_PATH` | Bash functions library | (core.func + tools.func) |
+| `VERBOSE` | Verbose mode | `yes`/`no` |
+| `STD` | Standard redirection | (silent/empty) |
+| `APP` | Application name | `Pihole` |
+| `NSAPP` | Normalized app name | `pihole` |
+| `METHOD` | Installation method | `ct`/`install` |
+| `RANDOM_UUID` | Session UUID | (for telemetry) |
+
+## Complete Script Template
+
+### Phase 1: Header & Initialization
+
+```bash
+#!/usr/bin/env bash
+# Copyright (c) 2021-2026 community-scripts ORG
+# Author: YourUsername
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://github.com/application/repo
+
+# Load all available functions (from core.func + tools.func)
+source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+
+# Initialize environment
+color                   # Setup ANSI colors and icons
+verb_ip6                # Configure IPv6 (if needed)
+catch_errors           # Setup error traps
+setting_up_container   # Verify OS is ready
+network_check          # Verify internet connectivity
+update_os              # Update packages (apk/apt)
+```
+
+### Phase 2: Dependency Installation
+
+```bash
+msg_info "Installing Dependencies"
+$STD apt-get install -y \
+  curl \
+  wget \
+  git \
+  nano \
+  build-essential \
+  libssl-dev \
+  python3-dev
+msg_ok "Installed Dependencies"
+```
+
+<Note>
+  Always use `$STD` before commands to respect the verbose mode setting. This silences output when verbose mode is disabled.
+</Note>
+
+### Phase 3: Tool Setup
+
+Use the helper functions from `tools.func` for common tool installations:
+
+```bash
+# Setup Node.js
+NODE_VERSION="22" setup_nodejs
+
+# Setup PHP with extensions
+PHP_VERSION="8.4" PHP_MODULE="bcmath,curl,gd,intl,redis" setup_php
+
+# Setup Python
+PYTHON_VERSION="3.12" setup_uv
+
+# Setup databases
+setup_mariadb      # Uses distribution packages (recommended)
+setup_postgresql   # PostgreSQL
+
+# Other tools
+setup_docker       # Docker Engine
+setup_composer     # PHP Composer
+setup_ruby         # Ruby
+setup_rust         # Rust
+```
+
+### Phase 4: Application Download
+
+<CodeGroup>
+```bash GitHub Release
+# Download from GitHub releases
+RELEASE=$(curl -fsSL https://api.github.com/repos/user/repo/releases/latest | \
+  grep "tag_name" | awk '{print substr($2, 2, length($2)-3)}')
+
+msg_info "Installing Application v${RELEASE}"
+cd /opt
+wget -q "https://github.com/user/repo/releases/download/v${RELEASE}/app-${RELEASE}.tar.gz"
+tar -xzf app-${RELEASE}.tar.gz
+rm -f app-${RELEASE}.tar.gz
+msg_ok "Installed Application v${RELEASE}"
+```
+
+```bash Git Clone
+# Clone from Git repository
+msg_info "Cloning Application Repository"
+cd /opt
+git clone --depth 1 https://github.com/user/repo.git appname
+cd appname
+msg_ok "Cloned Repository"
+```
+
+```bash Direct Download
+# Direct download from URL
+msg_info "Downloading Application"
+cd /opt
+wget -q https://example.com/releases/latest/app.tar.gz
+tar -xzf app.tar.gz
+rm -f app.tar.gz
+msg_ok "Downloaded Application"
+```
+</CodeGroup>
+
+### Phase 5: Configuration Files
+
+<Tabs>
+  <Tab title="Using cat with heredoc">
+    ```bash
+    # Create configuration file
+    cat <<'EOF' >/etc/nginx/sites-available/appname
+    server {
+        listen 80;
+        server_name _;
+        root /opt/appname/public;
+        index index.php index.html;
+        
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+        }
+        
+        location ~ \.php$ {
+            fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+            fastcgi_index index.php;
+            include fastcgi_params;
+        }
+    }
+    EOF
+    ```
+  </Tab>
+  
+  <Tab title="Using sed for replacements">
+    ```bash
+    # Modify existing configuration
+    sed -i -e "s|^DB_HOST=.*|DB_HOST=localhost|" \
+           -e "s|^DB_USER=.*|DB_USER=appuser|" \
+           -e "s|^DB_PASS=.*|DB_PASS=${DB_PASS}|" \
+           /opt/appname/.env
+    ```
+  </Tab>
+</Tabs>
+
+### Phase 6: Database Setup
+
+<Warning>
+  Always generate random passwords for database users. Never use hardcoded passwords.
+</Warning>
+
+```bash
+msg_info "Setting up Database"
+
+DB_NAME="appname_db"
+DB_USER="appuser"
+DB_PASS=$(openssl rand -base64 18 | tr -dc 'a-zA-Z0-9' | head -c13)
+
+# For MySQL/MariaDB
+mysql -u root <<EOF
+CREATE DATABASE ${DB_NAME};
+CREATE USER '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';
+GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
+# Save credentials to config
+cat > /opt/appname/.env <<EOF
+DB_HOST=localhost
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASS=${DB_PASS}
+EOF
+
+msg_ok "Database setup complete"
+```
+
+### Phase 7: Permissions
+
+```bash
+msg_info "Setting permissions"
+
+# Web applications typically run as www-data
+chown -R www-data:www-data /opt/appname
+chmod -R 755 /opt/appname
+chmod 600 /opt/appname/.env  # Protect sensitive files
+
+msg_ok "Permissions set"
+```
+
+### Phase 8: Service Configuration
+
+<CodeGroup>
+```bash Systemd (Debian/Ubuntu)
+# Create systemd service
+cat <<EOF >/etc/systemd/system/appname.service
+[Unit]
+Description=Application Name
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/appname
+ExecStart=/usr/bin/node /opt/appname/server.js
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start service
+systemctl daemon-reload
+systemctl enable -q --now appname
+
+# Verify service is running
+if systemctl is-active --quiet appname; then
+  msg_ok "Service running successfully"
+else
+  msg_error "Service failed to start"
+  journalctl -u appname -n 20
+  exit 1
+fi
+```
+
+```bash OpenRC (Alpine)
+# Create OpenRC service
+cat <<EOF >/etc/init.d/appname
+#!/sbin/openrc-run
+
+name="Application Name"
+command="/usr/bin/node"
+command_args="/opt/appname/server.js"
+command_user="www-data"
+directory="/opt/appname"
+
+depend() {
+    need net
+}
+EOF
+
+chmod +x /etc/init.d/appname
+
+# Enable and start service
+rc-service appname start
+rc-update add appname default
+```
+</CodeGroup>
+
+### Phase 9: Version Tracking
+
+<Note>
+  Version tracking is essential for the `update_script()` function in the container script to detect when updates are available.
+</Note>
+
+```bash
+# Essential for update detection
+echo "${RELEASE}" > /opt/${APP}_version.txt
+
+# Or with additional metadata
+cat > /opt/${APP}_version.txt <<EOF
+Version: ${RELEASE}
+InstallDate: $(date)
+InstallMethod: ${METHOD}
+EOF
+```
+
+### Phase 10: Final Setup & Cleanup
+
+```bash
+# Display MOTD and enable autologin
+motd_ssh
+
+# Final customization
+customize
+
+# Clean up package manager cache
+msg_info "Cleaning up"
+apt-get -y autoremove
+apt-get -y autoclean
+msg_ok "Cleaned"
+
+# System cleanup (removes logs, cache, etc.)
+cleanup_lxc
+```
+
+## Real-World Examples
+
+<Tabs>
+  <Tab title="Pi-hole">
+    ```bash install/pihole-install.sh
+    #!/usr/bin/env bash
+
+    # Copyright (c) 2021-2026 tteck
+    # Author: tteck (tteckster)
+    # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+    # Source: https://pi-hole.net/
+
+    source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+    color
+    verb_ip6
+    catch_errors
+    setting_up_container
+    network_check
+    update_os
+
+    msg_warn "WARNING: This script will run an external installer from a third-party source (https://pi-hole.net/)."
+    msg_warn "The following code is NOT maintained or audited by our repository."
+    msg_warn "If you have any doubts or concerns, please review the installer code before proceeding:"
+    msg_custom "${TAB3}${GATEWAY}${BGN}${CL}" "\e[1;34m" "→  https://install.pi-hole.net"
+    echo
+    read -r -p "${TAB3}Do you want to continue? [y/N]: " CONFIRM
+    if [[ ! "$CONFIRM" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+      msg_error "Aborted by user. No changes have been made."
+      exit 10
+    fi
+
+    msg_info "Installing Dependencies"
+    $STD apt install -y ufw
+    msg_ok "Installed Dependencies"
+
+    msg_info "Installing Pi-hole"
+    mkdir -p /etc/pihole
+    touch /etc/pihole/pihole.toml
+    $STD bash <(curl -fsSL https://install.pi-hole.net) --unattended
+    
+    # Configure Pi-hole settings
+    sed -i -E '
+    /^\s*upstreams =/ s|=.*|= ["8.8.8.8", "8.8.4.4"]|
+    /^\s*interface =/ s|=.*|= "eth0"|
+    /^\s*queryLogging =/ s|=.*|= true|
+    /^\s*listeningMode =/ s|=.*|= "LOCAL"|
+    /^\s*pwhash =/ s|=.*|= ""|
+    ' /etc/pihole/pihole.toml
+
+    systemctl restart pihole-FTL.service
+    msg_ok "Installed Pi-hole"
+
+    motd_ssh
+    customize
+    cleanup_lxc
+    ```
+  </Tab>
+  
+  <Tab title="Docker">
+    ```bash install/docker-install.sh
+    #!/usr/bin/env bash
+
+    # Copyright (c) 2021-2026 tteck
+    # Author: tteck (tteckster)
+    # License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+    # Source: https://www.docker.com/
+
+    source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+    color
+    verb_ip6
+    catch_errors
+    setting_up_container
+    network_check
+    update_os
+
+    DOCKER_LATEST_VERSION=$(get_latest_github_release "moby/moby")
+    PORTAINER_LATEST_VERSION=$(get_latest_github_release "portainer/portainer")
+
+    msg_info "Installing Docker $DOCKER_LATEST_VERSION (with Compose, Buildx)"
+    DOCKER_CONFIG_PATH='/etc/docker/daemon.json'
+    mkdir -p $(dirname $DOCKER_CONFIG_PATH)
+    echo -e '{\n  "log-driver": "journald"\n}' >/etc/docker/daemon.json
+    $STD sh <(curl -fsSL https://get.docker.com)
+    msg_ok "Installed Docker $DOCKER_LATEST_VERSION"
+
+    read -r -p "${TAB3}Would you like to add Portainer (UI)? <y/N> " prompt
+    if [[ ${prompt,,} =~ ^(y|yes)$ ]]; then
+      msg_info "Installing Portainer $PORTAINER_LATEST_VERSION"
+      docker volume create portainer_data >/dev/null
+      $STD docker run -d \
+        -p 8000:8000 \
+        -p 9443:9443 \
+        --name=portainer \
+        --restart=always \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v portainer_data:/data \
+        portainer/portainer-ce:latest
+      msg_ok "Installed Portainer $PORTAINER_LATEST_VERSION"
+    fi
+
+    motd_ssh
+    customize
+    cleanup_lxc
+    ```
+  </Tab>
+  
+  <Tab title="Node.js Application">
+    ```bash install/nodeapp-install.sh
+    #!/usr/bin/env bash
+    source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+
+    color
+    catch_errors
+    setting_up_container
+    network_check
+    update_os
+
+    msg_info "Installing Node.js"
+    NODE_VERSION="22" setup_nodejs
+    msg_ok "Node.js installed"
+
+    msg_info "Installing Application"
+    cd /opt
+    RELEASE=$(curl -fsSL https://api.github.com/repos/user/repo/releases/latest | \
+      grep "tag_name" | awk '{print substr($2, 2, length($2)-3)}')
+    wget -q "https://github.com/user/repo/releases/download/v${RELEASE}/app.tar.gz"
+    tar -xzf app.tar.gz
+    rm -f app.tar.gz
+    cd app
+    npm install --production
+    echo "${RELEASE}" > /opt/app_version.txt
+    msg_ok "Application installed"
+
+    msg_info "Creating Service"
+    cat <<EOF >/etc/systemd/system/app.service
+    [Unit]
+    Description=Node.js Application
+    After=network.target
+
+    [Service]
+    Type=simple
+    User=root
+    WorkingDirectory=/opt/app
+    ExecStart=/usr/bin/node server.js
+    Restart=always
+
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+
+    systemctl daemon-reload
+    systemctl enable --now app
+    msg_ok "Service created"
+
+    cleanup_lxc
+    ```
+  </Tab>
+</Tabs>
+
+## Core Messaging Functions
+
+### msg_info(message)
+
+Displays an info message with spinner animation:
+
+```bash
+msg_info "Installing application"
+# Output: ⏳ Installing application (with spinning animation)
+```
+
+### msg_ok(message)
+
+Displays success message with checkmark:
+
+```bash
+msg_ok "Installation completed"
+# Output: ✔️ Installation completed
+```
+
+### msg_error(message)
+
+Displays error message and exits:
+
+```bash
+msg_error "Installation failed"
+# Output: ✖️ Installation failed
+```
+
+### msg_warn(message)
+
+Displays warning message:
+
+```bash
+msg_warn "This will download from a third-party source"
+# Output: ⚠️ This will download from a third-party source
+```
+
+## Tool Installation Functions
+
+### setup_nodejs()
+
+Installs Node.js with optional global modules:
+
+```bash
+NODE_VERSION="22" setup_nodejs
+NODE_VERSION="22" NODE_MODULE="yarn,@vue/cli" setup_nodejs
+```
+
+### setup_php()
+
+Installs PHP with optional extensions:
+
+```bash
+PHP_VERSION="8.4" setup_php
+PHP_VERSION="8.4" PHP_MODULE="bcmath,curl,gd,intl,redis" setup_php
+```
+
+### Database Tools
+
+```bash
+setup_mariadb      # MariaDB database
+setup_mysql        # MySQL database
+setup_postgresql   # PostgreSQL
+```
+
+### Other Tools
+
+```bash
+setup_docker       # Docker Engine
+setup_composer     # PHP Composer
+setup_python       # Python 3
+setup_ruby         # Ruby
+setup_rust         # Rust
+```
+
+## Best Practices
+
+### DO:
+
+**Always use $STD for commands**
+```bash
+# ✅ Good: Respects VERBOSE setting
+$STD apt-get install -y nginx
+```
+
+**Generate random passwords safely**
+```bash
+# ✅ Good: Alphanumeric only
+DB_PASS=$(openssl rand -base64 18 | tr -dc 'a-zA-Z0-9' | head -c13)
+```
+
+**Check command success**
+```bash
+# ✅ Good: Verify success
+if ! wget -q "https://example.com/file.tar.gz"; then
+  msg_error "Download failed"
+  exit 1
+fi
+```
+
+**Set proper permissions**
+```bash
+# ✅ Good: Explicit permissions
+chown -R www-data:www-data /opt/appname
+chmod -R 755 /opt/appname
+chmod 600 /opt/appname/.env  # Protect secrets
+```
+
+**Save version for update checks**
+```bash
+# ✅ Good: Version tracked
+echo "${RELEASE}" > /opt/${APP}_version.txt
+```
+
+**Handle Alpine vs Debian differences**
+```bash
+# ✅ Good: Detect OS
+if grep -qi 'alpine' /etc/os-release; then
+  apk add package
+else
+  apt-get install -y package
+fi
+```
+
+### DON'T:
+
+**Hardcode versions**
+```bash
+# ❌ Bad: Won't auto-update
+wget https://example.com/app-1.2.3.tar.gz
+
+# ✅ Good: Fetch latest
+RELEASE=$(curl -fsSL https://api.github.com/repos/user/repo/releases/latest | \
+  grep "tag_name" | awk '{print substr($2, 2, length($2)-3)}')
+wget "https://example.com/app-${RELEASE}.tar.gz"
+```
+
+**Forget error handling**
+```bash
+# ❌ Bad: Silent failures
+wget https://example.com/file
+tar -xzf file
+
+# ✅ Good: Check errors
+if ! wget https://example.com/file; then
+  msg_error "Download failed"
+  exit 1
+fi
+```
+
+**Leave temporary files**
+```bash
+# ✅ Always cleanup
+rm -rf /opt/app-${RELEASE}.tar.gz /tmp/build-artifacts
+```
+
+## Troubleshooting
+
+### Installation Hangs
+
+**Check internet connectivity**:
+```bash
+ping -c 1 8.8.8.8
+```
+
+**Enable verbose mode**:
+```bash
+# In ct/AppName.sh, before running
+VERBOSE="yes" bash install/AppName-install.sh
+```
+
+### Package Not Found
+
+**Update package lists**:
+```bash
+apt update
+apt-cache search package_name
+```
+
+### Service Won't Start
+
+**Check logs**:
+```bash
+journalctl -u appname -n 50
+systemctl status appname
+```
+
+## Contribution Checklist
+
+Before submitting a PR:
+
+- [ ] Shebang is `#!/usr/bin/env bash`
+- [ ] Loads functions from `$FUNCTIONS_FILE_PATH`
+- [ ] Copyright header with author
+- [ ] Clear phase comments
+- [ ] `setting_up_container` called early
+- [ ] `network_check` before downloads
+- [ ] `update_os` before package installation
+- [ ] All errors checked properly
+- [ ] Uses `msg_info/msg_ok/msg_error` for status
+- [ ] Uses `$STD` for command output silencing
+- [ ] Version saved to `/opt/${APP}_version.txt`
+- [ ] Proper permissions set
+- [ ] `motd_ssh` called for final setup
+- [ ] `customize` called for options
+- [ ] `cleanup_lxc` called at end
+- [ ] Tested with default settings
+- [ ] Tested with advanced (19-step) mode
+- [ ] Service starts and runs correctly

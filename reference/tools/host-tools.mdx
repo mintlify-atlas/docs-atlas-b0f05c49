@@ -1,0 +1,332 @@
+---
+title: Host Management Tools
+description: Essential scripts for managing Proxmox VE hosts, including updates, kernel management, and system configuration
+---
+
+Host management tools provide essential functionality for maintaining and configuring your Proxmox VE host system. These scripts run directly on the Proxmox host and help automate common administrative tasks.
+
+## Container Management
+
+### Update LXC Containers
+
+The `update-lxcs.sh` script provides an interactive way to update multiple LXC containers simultaneously.
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs.sh)"
+```
+
+<Accordion title="Features">
+- Interactive container selection with whiptail interface
+- Option to skip stopped containers
+- Exclude specific containers from updates
+- Automatic detection of package manager (apt, apk, dnf, yum, pacman)
+- Color-coded status output
+</Accordion>
+
+<Note>
+The script will prompt you to select which containers to skip and whether to update only running containers.
+</Note>
+
+### Cron-based Container Updates
+
+Automate container updates with scheduled cron jobs:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-lxcs-cron.sh)"
+```
+
+This installs a weekly cron job that automatically updates all LXC containers.
+
+### Container Cleanup
+
+Remove unused packages and clear cache from containers:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/clean-lxcs.sh)"
+```
+
+<CardGroup cols={2}>
+  <Card title="clean-lxcs.sh" icon="broom">
+    Cleans package cache and removes unused packages from LXC containers
+  </Card>
+  <Card title="clean-orphaned-lvm.sh" icon="hard-drive">
+    Removes orphaned LVM volumes that are no longer associated with containers
+  </Card>
+</CardGroup>
+
+### Container Deletion
+
+Safely delete LXC containers with confirmation:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/lxc-delete.sh)"
+```
+
+## Post-Installation Configuration
+
+### Proxmox VE Post-Install
+
+Optimize your Proxmox VE installation with recommended settings:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/post-pve-install.sh)"
+```
+
+<Accordion title="Post-Install Features">
+- Disable enterprise repository (if unlicensed)
+- Enable no-subscription repository
+- Configure apt sources correctly
+- Disable subscription nag dialog
+- Update and upgrade system packages
+- Install useful utilities
+- Configure automatic security updates (optional)
+</Accordion>
+
+### Proxmox Backup Server Post-Install
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/post-pbs-install.sh)"
+```
+
+### Proxmox Mail Gateway Post-Install
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/post-pmg-install.sh)"
+```
+
+## Kernel Management
+
+### Kernel Clean
+
+Remove old kernel versions to free up disk space:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/kernel-clean.sh)"
+```
+
+<Warning>
+Never remove your currently running kernel. The script automatically excludes the active kernel from removal.
+</Warning>
+
+The script:
+- Detects the currently running kernel
+- Lists all installed kernel versions
+- Allows interactive selection of kernels to remove
+- Safely removes selected kernel packages
+
+### Kernel Pin
+
+Pin a specific kernel version to prevent automatic updates:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/kernel-pin.sh)"
+```
+
+<Note>
+Use this when you have a stable kernel and want to prevent automatic upgrades that might introduce issues.
+</Note>
+
+## System Optimization
+
+### Microcode Updates
+
+Install and update CPU microcode for Intel and AMD processors:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/microcode.sh)"
+```
+
+<CardGroup cols={2}>
+  <Card title="Intel" icon="microchip">
+    Installs intel-microcode package and updates Intel CPU firmware
+  </Card>
+  <Card title="AMD" icon="microchip">
+    Installs amd64-microcode package and updates AMD CPU firmware
+  </Card>
+</CardGroup>
+
+### CPU Scaling Governor
+
+Configure CPU frequency scaling for performance or power savings:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/scaling-governor.sh)"
+```
+
+Available governors:
+- **performance**: Maximum CPU frequency at all times
+- **powersave**: Minimum CPU frequency to save power
+- **ondemand**: Dynamic scaling based on load
+- **conservative**: Gradual frequency scaling
+
+### Hardware Acceleration
+
+Enable hardware video acceleration for Plex, Jellyfin, and other media servers:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/hw-acceleration.sh)"
+```
+
+Supports:
+- Intel Quick Sync Video (QSV)
+- NVIDIA NVENC/NVDEC
+- AMD AMF/VCE
+- VAAPI
+
+### NIC Offloading Fix
+
+Resolve network performance issues caused by NIC offloading:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/nic-offloading-fix.sh)"
+```
+
+## Backup and Restore
+
+### Host Backup
+
+Create backups of important Proxmox host configuration:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/host-backup.sh)"
+```
+
+<Accordion title="Backup Capabilities">
+- Backs up `/etc/` directory by default
+- Custom directory selection available
+- Choose specific subdirectories to include
+- Creates compressed tar archives
+- Saves to custom location (default: `/root/`)
+</Accordion>
+
+### Container Restore from Backup
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/container-restore-from-backup.sh)"
+```
+
+### Core Restore from Backup
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/core-restore-from-backup.sh)"
+```
+
+## Monitoring
+
+### Monitor All
+
+Automatically monitor and restart failed VMs and containers:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/monitor-all.sh)"
+```
+
+<Warning>
+This creates a systemd service that continuously monitors instances. Only instances tagged with `mon-restart` will be automatically restarted.
+</Warning>
+
+**How to tag instances:**
+
+```bash
+# For VMs
+qm set <vmid> -tags mon-restart
+
+# For Containers
+pct set <ctid> -tags mon-restart
+```
+
+Or use the Proxmox web UI: VM/CT → Options → Tags → Add "mon-restart"
+
+### FSTRIM Service
+
+Enable periodic FSTRIM for SSD optimization:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/fstrim.sh)"
+```
+
+## Version Upgrades
+
+### Upgrade to Proxmox VE 8
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/pve8-upgrade.sh)"
+```
+
+### Upgrade to Proxmox Backup Server 3
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/pbs3-upgrade.sh)"
+```
+
+### Upgrade to Proxmox Backup Server 4
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/pbs4-upgrade.sh)"
+```
+
+<Warning>
+Always create backups before performing major version upgrades. Read the official Proxmox upgrade documentation for your specific version.
+</Warning>
+
+## Specialized Tools
+
+### Add IP Tag
+
+Add IP address tags to containers and VMs for easy identification:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/add-iptag.sh)"
+```
+
+### USB Passthrough
+
+Configure USB device passthrough to containers:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/usb-passthrough.sh)"
+```
+
+### Execute Command Across Containers
+
+Run commands in multiple containers simultaneously:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/execute.sh)"
+```
+
+### Repository Update
+
+Update Proxmox repository configuration:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-repo.sh)"
+```
+
+### Frigate Support
+
+Optimize Proxmox for running Frigate NVR:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/frigate-support.sh)"
+```
+
+### PVE Privilege Converter
+
+Convert Proxmox user privileges between different formats:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/pve-privilege-converter.sh)"
+```
+
+## Application Updates
+
+Update self-hosted applications running in containers:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/update-apps.sh)"
+```
+
+<Note>
+This script detects common self-hosted applications and updates them to the latest versions using their native update mechanisms.
+</Note>

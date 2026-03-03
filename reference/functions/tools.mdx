@@ -1,0 +1,656 @@
+---
+title: Tools Functions
+description: Package management and system utilities for Proxmox VE containers
+---
+
+The `tools.func` library provides unified helper functions for robust package installation and repository management across Debian/Ubuntu OS upgrades. It includes automatic retry logic, keyring cleanup, legacy installation cleanup, and OS-upgrade-safe repository preparation.
+
+## Core Package Management
+
+### install_packages_with_retry()
+
+Installs packages with automatic retry logic and dependency resolution.
+
+<ParamField path="packages" type="array" required>
+  List of package names to install
+</ParamField>
+
+<ParamField path="max_retries" type="number" default="3">
+  Maximum number of retry attempts
+</ParamField>
+
+```bash tools.func:416-477
+install_packages_with_retry() {
+  local packages=("$@")
+  local max_retries=3
+  local retry=0
+
+  # Pre-check: ensure dpkg is not in a broken state
+  if dpkg --audit 2>&1 | grep -q .; then
+    $STD dpkg --configure -a 2>/dev/null || true
+  fi
+
+  while [[ $retry -le $max_retries ]]; do
+    if DEBIAN_FRONTEND=noninteractive $STD apt install -y \
+      -o Dpkg::Options::="--force-confdef" \
+      -o Dpkg::Options::="--force-confold" \
+      "${packages[@]}" 2>/dev/null; then
+      return 0
+    fi
+
+    retry=$((retry + 1))
+    if [[ $retry -le $max_retries ]]; then
+      msg_warn "Package installation failed, retrying ($retry/$max_retries)..."
+
+      # Progressive recovery steps
+      case $retry in
+      1)
+        # First retry: fix dpkg and update
+        $STD dpkg --configure -a 2>/dev/null || true
+        $STD apt update 2>/dev/null || true
+        ;;
+      2)
+        # Second retry: fix broken dependencies
+        $STD apt --fix-broken install -y 2>/dev/null || true
+        $STD apt update 2>/dev/null || true
+        ;;
+      3)
+        # Third retry: install packages one by one
+        local failed=()
+        for pkg in "${packages[@]}"; do
+          if ! $STD apt install -y "$pkg" 2>/dev/null; then
+            if ! $STD apt install -y --fix-missing "$pkg" 2>/dev/null; then
+              failed+=("$pkg")
+            fi
+          fi
+        done
+        # Partial success handling
+        if [[ ${#failed[@]} -lt ${#packages[@]} ]]; then
+          if [[ ${#failed[@]} -gt 0 ]]; then
+            msg_warn "Partially installed. Failed packages: ${failed[*]}"
+          fi
+          return 0
+        fi
+        ;;
+      esac
+
+      sleep $((retry * 2))
+    fi
+  done
+
+  msg_error "Failed to install packages after $((max_retries + 1)) attempts: ${packages[*]}"
+  return 1
+}
+```
+
+### upgrade_packages_with_retry()
+
+Upgrades specific packages with retry logic.
+
+<ParamField path="packages" type="array" required>
+  List of package names to upgrade
+</ParamField>
+
+```bash tools.func:483-508
+upgrade_packages_with_retry() {
+  local packages=("$@")
+  local max_retries=2
+  local retry=0
+
+  while [[ $retry -le $max_retries ]]; do
+    if DEBIAN_FRONTEND=noninteractive $STD apt install --only-upgrade -y \
+      -o Dpkg::Options::="--force-confdef" \
+      -o Dpkg::Options::="--force-confold" \
+      "${packages[@]}" 2>/dev/null; then
+      return 0
+    fi
+
+    retry=$((retry + 1))
+    if [[ $retry -le $max_retries ]]; then
+      msg_warn "Package upgrade failed, retrying ($retry/$max_retries)..."
+      sleep 2
+      # Fix any interrupted dpkg operations
+      $STD dpkg --configure -a 2>/dev/null || true
+      $STD apt update 2>/dev/null || true
+    fi
+  done
+
+  msg_error "Failed to upgrade packages after $((max_retries + 1)) attempts: ${packages[*]}"
+  return 1
+}
+```
+
+## Network Utilities
+
+### curl_with_retry()
+
+Robust curl wrapper with retry logic, timeouts, and error handling.
+
+<ParamField path="url" type="string" required>
+  URL to download
+</ParamField>
+
+<ParamField path="output" type="string" default="-">
+  Output file path (use `-` for stdout)
+</ParamField>
+
+<ParamField path="extra_opts" type="string">
+  Additional curl options as string
+</ParamField>
+
+<Expandable title="Environment Variables">
+  - `CURL_RETRIES`: Number of retries (default: 3)
+  - `CURL_TIMEOUT`: Max time per attempt in seconds (default: 60)
+  - `CURL_CONNECT_TO`: Connection timeout in seconds (default: 10)
+</Expandable>
+
+```bash tools.func:68-123
+curl_with_retry() {
+  local url="$1"
+  local output="${2:--}"
+  local extra_opts="${3:-}"
+  local retries="${CURL_RETRIES:-3}"
+  local timeout="${CURL_TIMEOUT:-60}"
+  local connect_timeout="${CURL_CONNECT_TO:-10}"
+
+  local attempt=1
+  local success=false
+  local backoff=1
+
+  # DNS pre-check - fail fast if host is unresolvable
+  local host
+  host=$(echo "$url" | sed -E 's|^https?://([^/:]+).*|\1|')
+  if ! getent hosts "$host" &>/dev/null; then
+    debug_log "DNS resolution failed for $host"
+    return 1
+  fi
+
+  while [[ $attempt -le $retries ]]; do
+    debug_log "curl attempt $attempt/$retries: $url"
+
+    local curl_cmd="curl -fsSL --connect-timeout $connect_timeout --max-time $timeout"
+    [[ -n "$extra_opts" ]] && curl_cmd="$curl_cmd $extra_opts"
+
+    if [[ "$output" == "-" ]]; then
+      if $curl_cmd "$url"; then
+        success=true
+        break
+      fi
+    else
+      if $curl_cmd -o "$output" "$url"; then
+        success=true
+        break
+      fi
+    fi
+
+    debug_log "curl attempt $attempt failed, waiting ${backoff}s before retry..."
+    sleep "$backoff"
+    # Exponential backoff: 1, 2, 4, 8... capped at 30s
+    backoff=$((backoff * 2))
+    ((backoff > 30)) && backoff=30
+    ((attempt++))
+  done
+
+  if [[ "$success" == "true" ]]; then
+    debug_log "curl successful: $url"
+    return 0
+  else
+    debug_log "curl FAILED after $retries attempts: $url"
+    return 1
+  fi
+}
+```
+
+### download_gpg_key()
+
+Downloads and installs GPG key with retry logic and validation.
+
+<ParamField path="url" type="string" required>
+  URL to GPG key
+</ParamField>
+
+<ParamField path="output" type="string" required>
+  Output path for keyring file
+</ParamField>
+
+<ParamField path="mode" type="string" default="auto">
+  Key format: `auto`, `dearmor`, or `binary`
+</ParamField>
+
+```bash tools.func:204-262
+download_gpg_key() {
+  local url="$1"
+  local output="$2"
+  local mode="${3:-auto}" # auto, dearmor, or binary
+  local retries="${CURL_RETRIES:-3}"
+  local timeout="${CURL_TIMEOUT:-30}"
+  local temp_key
+  temp_key=$(mktemp)
+
+  mkdir -p "$(dirname "$output")"
+
+  local attempt=1
+  while [[ $attempt -le $retries ]]; do
+    debug_log "GPG key download attempt $attempt/$retries: $url"
+
+    # Download to temp file first
+    if ! curl -fsSL --connect-timeout 10 --max-time "$timeout" -o "$temp_key" "$url" 2>/dev/null; then
+      debug_log "GPG key download attempt $attempt failed, waiting ${attempt}s..."
+      sleep "$attempt"
+      ((attempt++))
+      continue
+    fi
+
+    # Auto-detect key format if mode is auto
+    if [[ "$mode" == "auto" ]]; then
+      if file "$temp_key" 2>/dev/null | grep -qi "pgp\\|gpg\\|public key"; then
+        mode="binary"
+      elif grep -q "BEGIN PGP" "$temp_key" 2>/dev/null; then
+        mode="dearmor"
+      else
+        # Try to detect by extension
+        [[ "$url" == *.asc || "$url" == *.txt ]] && mode="dearmor" || mode="binary"
+      fi
+    fi
+
+    # Process based on mode
+    if [[ "$mode" == "dearmor" ]]; then
+      if gpg --dearmor --yes -o "$output" <"$temp_key" 2>/dev/null; then
+        rm -f "$temp_key"
+        debug_log "GPG key installed (dearmored): $output"
+        return 0
+      fi
+    else
+      if mv "$temp_key" "$output" 2>/dev/null; then
+        chmod 644 "$output"
+        debug_log "GPG key installed: $output"
+        return 0
+      fi
+    fi
+
+    debug_log "GPG key processing attempt $attempt failed"
+    sleep "$attempt"
+    ((attempt++))
+  done
+
+  rm -f "$temp_key"
+  debug_log "GPG key download FAILED after $retries attempts: $url"
+  return 1
+}
+```
+
+## Repository Management
+
+### prepare_repository_setup()
+
+Unified repository preparation before setup.
+
+<ParamField path="repo_names" type="array" required>
+  List of repository names to prepare
+</ParamField>
+
+```bash tools.func:391-406
+prepare_repository_setup() {
+  local repo_names=("$@")
+
+  # Clean up all old repository files
+  for repo in "${repo_names[@]}"; do
+    cleanup_old_repo_files "$repo"
+  done
+
+  # Clean up all keyrings
+  cleanup_tool_keyrings "${repo_names[@]}"
+
+  # Ensure APT is in working state
+  ensure_apt_working || return 1
+
+  return 0
+}
+```
+
+### cleanup_old_repo_files()
+
+Removes old repository files (migration helper).
+
+<ParamField path="app" type="string" required>
+  Application/repository name
+</ParamField>
+
+```bash tools.func:1574-1592
+cleanup_old_repo_files() {
+  local app="$1"
+
+  # Remove old-style .list files (including backups)
+  rm -f /etc/apt/sources.list.d/"${app}"*.list
+  rm -f /etc/apt/sources.list.d/"${app}"*.list.save
+  rm -f /etc/apt/sources.list.d/"${app}"*.list.distUpgrade
+  rm -f /etc/apt/sources.list.d/"${app}"*.list.dpkg-*
+
+  # Remove old GPG keys from trusted.gpg.d
+  rm -f /etc/apt/trusted.gpg.d/"${app}"*.gpg
+
+  # Remove keyrings from /etc/apt/keyrings
+  rm -f /etc/apt/keyrings/"${app}"*.gpg
+
+  # Remove ALL .sources files for this app
+  rm -f /etc/apt/sources.list.d/"${app}"*.sources
+}
+```
+
+### cleanup_tool_keyrings()
+
+Cleans up ALL keyring locations for a tool.
+
+<ParamField path="tool_patterns" type="array" required>
+  List of tool name patterns
+</ParamField>
+
+```bash tools.func:288-296
+cleanup_tool_keyrings() {
+  local tool_patterns=("$@")
+
+  for pattern in "${tool_patterns[@]}"; do
+    rm -f /usr/share/keyrings/${pattern}*.gpg \
+      /etc/apt/keyrings/${pattern}*.gpg \
+      /etc/apt/trusted.gpg.d/${pattern}*.gpg 2>/dev/null || true
+  done
+}
+```
+
+## Tool Version Management
+
+### is_tool_installed()
+
+Checks if tool is already installed with optional version verification.
+
+<ParamField path="tool_name" type="string" required>
+  Tool name: `mariadb`, `mysql`, `mongodb`, `nodejs`, `php`, `postgresql`, etc.
+</ParamField>
+
+<ParamField path="required_version" type="string">
+  Required version to match (optional)
+</ParamField>
+
+```bash tools.func:515-584
+is_tool_installed() {
+  local tool_name="$1"
+  local required_version="${2:-}"
+  local installed_version=""
+
+  case "$tool_name" in
+  mariadb)
+    if command -v mariadb >/dev/null 2>&1; then
+      installed_version=$(mariadb --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    fi
+    ;;
+  mysql)
+    if command -v mysql >/dev/null 2>&1; then
+      installed_version=$(mysql --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    fi
+    ;;
+  mongodb | mongod)
+    if command -v mongod >/dev/null 2>&1; then
+      installed_version=$(mongod --version 2>/dev/null | awk '/db version/{print $3}' | cut -d. -f1,2)
+    fi
+    ;;
+  node | nodejs)
+    if command -v node >/dev/null 2>&1; then
+      installed_version=$(node -v 2>/dev/null | grep -oP '^v\K[0-9]+')
+    fi
+    ;;
+  php)
+    if command -v php >/dev/null 2>&1; then
+      installed_version=$(php -v 2>/dev/null | awk '/^PHP/{print $2}' | cut -d. -f1,2)
+    fi
+    ;;
+  postgresql)
+    if command -v psql >/dev/null 2>&1; then
+      installed_version=$(psql --version 2>/dev/null | awk '{print $3}' | cut -d. -f1)
+    fi
+    ;;
+  esac
+
+  if [[ -z "$installed_version" ]]; then
+    return 1 # Not installed
+  fi
+
+  if [[ -n "$required_version" && "$installed_version" != "$required_version" ]]; then
+    echo "$installed_version"
+    return 1 # Version mismatch
+  fi
+
+  echo "$installed_version"
+  return 0 # Installed and version matches
+}
+```
+
+### verify_tool_version()
+
+Verifies installed tool version matches expected version.
+
+<ParamField path="tool_name" type="string" required>
+  Tool name
+</ParamField>
+
+<ParamField path="expected_version" type="string" required>
+  Expected major version
+</ParamField>
+
+<ParamField path="installed_version" type="string" required>
+  Installed version to verify
+</ParamField>
+
+```bash tools.func:326-341
+verify_tool_version() {
+  local tool_name="$1"
+  local expected_version="$2"
+  local installed_version="$3"
+
+  # Extract major version for comparison
+  local expected_major="${expected_version%%.*}"
+  local installed_major="${installed_version%%.*}"
+
+  if [[ "$installed_major" != "$expected_major" ]]; then
+    msg_warn "$tool_name version mismatch: expected $expected_version, got $installed_version"
+    return 1
+  fi
+
+  return 0
+}
+```
+
+## GitHub API Integration
+
+### github_api_call()
+
+GitHub API call with authentication and rate limit handling.
+
+<ParamField path="url" type="string" required>
+  GitHub API URL
+</ParamField>
+
+<ParamField path="output_file" type="string" default="/dev/stdout">
+  Output file for response body
+</ParamField>
+
+<Expandable title="Environment Variables">
+  - `GITHUB_TOKEN`: GitHub personal access token (optional, increases rate limit)
+</Expandable>
+
+```bash tools.func:1085-1154
+github_api_call() {
+  local url="$1"
+  local output_file="${2:-/dev/stdout}"
+  local max_retries=3
+  local retry_delay=2
+
+  local header_args=()
+  [[ -n "${GITHUB_TOKEN:-}" ]] && header_args=(-H "Authorization: Bearer $GITHUB_TOKEN")
+
+  for attempt in $(seq 1 $max_retries); do
+    local http_code
+    http_code=$(curl -sSL -w "%{http_code}" -o "$output_file" \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "${header_args[@]}" \
+      "$url" 2>/dev/null) || true
+
+    case "$http_code" in
+    200)
+      return 0
+      ;;
+    401)
+      msg_error "GitHub API authentication failed (HTTP 401)."
+      if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        msg_error "Your GITHUB_TOKEN appears to be invalid or expired."
+      else
+        msg_error "The repository may require authentication. Try: export GITHUB_TOKEN=\"ghp_your_token\""
+      fi
+      return 1
+      ;;
+    403)
+      # Rate limit - check if we can retry
+      if [[ $attempt -lt $max_retries ]]; then
+        msg_warn "GitHub API rate limit, waiting ${retry_delay}s... (attempt $attempt/$max_retries)"
+        sleep "$retry_delay"
+        retry_delay=$((retry_delay * 2))
+        continue
+      fi
+      msg_error "GitHub API rate limit exceeded (HTTP 403)."
+      msg_error "To increase the limit, export a GitHub token before running the script:"
+      msg_error "  export GITHUB_TOKEN=\"ghp_your_token_here\""
+      return 1
+      ;;
+    404)
+      msg_error "GitHub repository or release not found (HTTP 404): $url"
+      return 1
+      ;;
+    esac
+  done
+
+  msg_error "GitHub API call failed after ${max_retries} attempts: ${url}"
+  return 1
+}
+```
+
+## System Information
+
+### get_os_info()
+
+Gets OS information (cached for performance).
+
+<ParamField path="field" type="string" default="all">
+  Field to retrieve: `id`, `codename`, `version`, `version_id`, `all`
+</ParamField>
+
+```bash tools.func:1230-1250
+get_os_info() {
+  local field="${1:-all}" # id, codename, version, version_id, all
+
+  # Cache OS info to avoid repeated file reads
+  if [[ -z "${_OS_ID:-}" ]]; then
+    export _OS_ID=$(awk -F= '/^ID=/{gsub(/"/,"",$2); print $2}' /etc/os-release)
+    export _OS_CODENAME=$(awk -F= '/^VERSION_CODENAME=/{gsub(/"/,"",$2); print $2}' /etc/os-release)
+    export _OS_VERSION=$(awk -F= '/^VERSION_ID=/{gsub(/"/,"",$2); print $2}' /etc/os-release)
+    export _OS_VERSION_FULL=$(awk -F= '/^VERSION=/{gsub(/"/,"",$2); print $2}' /etc/os-release)
+  fi
+
+  case "$field" in
+  id) echo "$_OS_ID" ;;
+  codename) echo "$_OS_CODENAME" ;;
+  version) echo "$_OS_VERSION" ;;
+  version_id) echo "$_OS_VERSION" ;;
+  version_full) echo "$_OS_VERSION_FULL" ;;
+  all) echo "ID=$_OS_ID CODENAME=$_OS_CODENAME VERSION=$_OS_VERSION" ;;
+  *) echo "$_OS_ID" ;;
+  esac
+}
+```
+
+## Usage Examples
+
+<CodeGroup>
+```bash Install Packages
+# Install with retry
+install_packages_with_retry "nginx" "mariadb-server" "php-fpm"
+
+# Upgrade specific packages
+upgrade_packages_with_retry "mysql-server" "mysql-client"
+```
+
+```bash Download with Retry
+# Download file with retry
+curl_with_retry "https://example.com/file.tar.gz" "/tmp/file.tar.gz"
+
+# Download to stdout
+curl_with_retry "https://api.github.com/repos/owner/repo" "-" | jq .
+
+# With custom timeout
+CURL_RETRIES=5 CURL_TIMEOUT=120 curl_with_retry "https://slow.server/file" "/tmp/out"
+```
+
+```bash Manage Repositories
+# Prepare repository
+prepare_repository_setup "mariadb" "mysql"
+
+# Clean up old files
+cleanup_old_repo_files "postgresql"
+cleanup_tool_keyrings "mariadb" "mysql"
+```
+
+```bash Check Tool Versions
+# Check if tool is installed
+if is_tool_installed "nodejs" "22"; then
+  echo "Node.js 22 is installed"
+fi
+
+# Get installed version
+installed=$(is_tool_installed "php")
+echo "Installed PHP version: $installed"
+
+# Verify version
+if verify_tool_version "nodejs" "22" "22.5.1"; then
+  echo "Version matches"
+fi
+```
+
+```bash GitHub API
+# Download latest release info
+github_api_call "https://api.github.com/repos/owner/repo/releases/latest" "/tmp/release.json"
+
+# With authentication token
+export GITHUB_TOKEN="ghp_your_token_here"
+github_api_call "https://api.github.com/repos/private/repo" "/tmp/response.json"
+```
+</CodeGroup>
+
+## Debug Mode
+
+Enable debug mode for troubleshooting:
+
+```bash
+export TOOLS_DEBUG=true
+./script.sh
+```
+
+Debug output will be written to stderr:
+
+```
+[DEBUG] curl attempt 1/3: https://example.com/file
+[DEBUG] curl successful: https://example.com/file
+[DEBUG] GPG key installed: /etc/apt/keyrings/example.gpg
+```
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Build Functions" icon="hammer" href="./build">
+    LXC container build and configuration
+  </Card>
+  <Card title="Install Functions" icon="download" href="./install">
+    Container installation and setup
+  </Card>
+  <Card title="API Functions" icon="chart-line" href="./api">
+    Telemetry and diagnostics API
+  </Card>
+</CardGroup>

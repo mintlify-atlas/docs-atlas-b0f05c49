@@ -1,0 +1,567 @@
+---
+title: Contribution Guidelines
+description: Coding standards, best practices, and PR submission process for Proxmox VE Helper Scripts
+---
+
+## Overview
+
+These guidelines ensure consistency, quality, and maintainability across the Proxmox VE Helper Scripts project. Following these standards makes code reviews faster and contributions easier to merge.
+
+<Note>
+  Use the template files in `docs/contribution/templates_*` as starting points. They already follow these guidelines.
+</Note>
+
+## Coding Standards
+
+### File Structure and Naming
+
+#### Naming Conventions
+
+```bash
+# Container script (Title Case)
+ct/MyApp.sh
+
+# Installation script (lowercase with hyphens)
+install/myapp-install.sh
+
+# JSON metadata (lowercase)
+frontend/public/json/myapp.json
+
+# Must match across files
+ct/PiHole.sh        → install/pihole-install.sh
+ct/NextCloud.sh     → install/nextcloud-install.sh
+ct/HomeAssistant.sh → install/homeassistant-install.sh
+```
+
+<Warning>
+  The APP variable in your container script must match the filename. For example, if your file is `ct/Example.sh`, set `APP="Example"`.
+</Warning>
+
+### Script Headers
+
+All scripts must include proper headers:
+
+#### Container Script Header (ct/)
+
+```bash
+#!/usr/bin/env bash
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+
+# Application metadata
+APP="MyApp"
+var_tags="category;tag2;tag3"
+var_cpu="2"
+var_ram="2048"
+var_disk="10"
+var_os="debian"
+var_version="12"
+var_unprivileged="1"
+```
+
+#### Installation Script Header (install/)
+
+```bash
+#!/usr/bin/env bash
+# Copyright (c) 2021-2026 community-scripts ORG
+# Author: YourGitHubUsername
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://github.com/original/repo
+# Description: Brief description of what this installs
+
+source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
+color
+verb_ip6
+catch_errors
+setting_up_container
+network_check
+update_os
+```
+
+### Variable Naming
+
+Follow these conventions for clarity:
+
+```bash
+# ✅ GOOD - Clear and consistent
+APP="MyApp"                    # Constants (UPPERCASE)
+var_cpu="2"                    # Configuration (var_* prefix)
+container_id="100"             # Local variables (lowercase)
+DB_PASSWORD="secret"           # Environment-style (UPPERCASE)
+app_version="1.2.3"            # Application data (lowercase)
+
+# ❌ BAD - Inconsistent or unclear
+myapp="MyApp"                  # Should be uppercase
+VAR_CPU="2"                    # Don't capitalize var_ prefix
+containerid="100"              # Use underscores for readability
+dbpassword="secret"            # Hard to parse
+```
+
+### Function Naming
+
+Use descriptive verb-noun patterns:
+
+```bash
+# ✅ GOOD - Clear purpose
+function update_script() { }
+function setup_database() { }
+function install_dependencies() { }
+function check_version() { }
+
+# ❌ BAD - Vague or unclear
+function update() { }          # Too generic
+function db() { }              # Unclear action
+function setup() { }           # What is being set up?
+```
+
+### Quoting and Command Formatting
+
+<Tabs>
+  <Tab title="Variables">
+    Always quote variables to prevent word splitting:
+    
+    ```bash
+    # ✅ GOOD
+    echo "${APP}"
+    if [[ "${var_version}" == "12" ]]; then
+    curl -fsSL "${URL}/${FILE}"
+    
+    # ❌ BAD
+    echo $APP                    # Unquoted
+    if [ $var_version = "12" ]   # Use [[ ]] instead
+    curl -fsSL $URL/$FILE        # Unsafe
+    ```
+  </Tab>
+  
+  <Tab title="Commands">
+    Format long commands for readability:
+    
+    ```bash
+    # ✅ GOOD - Multiline with backslashes
+    $STD apt-get install -y \
+      package1 \
+      package2 \
+      package3
+    
+    # ✅ GOOD - Error checking
+    if ! wget -q "${URL}"; then
+      msg_error "Failed to download"
+      exit 1
+    fi
+    
+    # ❌ BAD - Too long
+    $STD apt-get install -y package1 package2 package3 package4 package5
+    
+    # ❌ BAD - No error handling
+    wget $URL
+    ```
+  </Tab>
+  
+  <Tab title="Conditionals">
+    Use modern bash syntax:
+    
+    ```bash
+    # ✅ GOOD - Modern syntax
+    if [[ -f "/path/to/file" ]]; then
+      echo "File exists"
+    fi
+    
+    if [[ "${var}" == "value" ]]; then
+      echo "Match found"
+    fi
+    
+    # ❌ BAD - Old syntax
+    if [ -f "/path/to/file" ]; then
+      echo "File exists"
+    fi
+    
+    if test "$var" = "value"; then
+      echo "Match found"
+    fi
+    ```
+  </Tab>
+</Tabs>
+
+## Using Helper Functions
+
+The project provides many helper functions in `misc/tools.func`. Always use these instead of writing custom implementations.
+
+### Common Helper Functions
+
+<AccordionGroup>
+  <Accordion title="setup_nodejs - Install Node.js">
+    ```bash
+    # Install specific Node.js version
+    NODE_VERSION="20" setup_nodejs
+    
+    # This handles:
+    # - Repository addition
+    # - Package installation
+    # - Version verification
+    ```
+  </Accordion>
+
+  <Accordion title="fetch_and_deploy_gh_release - Download from GitHub">
+    ```bash
+    # Fetch latest release from GitHub
+    fetch_and_deploy_gh_release "appname" "owner/repo" "tarball" "latest" "/opt/appname"
+    
+    # Parameters:
+    # 1. Application name (for messages)
+    # 2. GitHub repo (owner/name)
+    # 3. Asset type (tarball, zipball, or specific asset name)
+    # 4. Version (latest, or specific tag like v1.2.3)
+    # 5. Destination directory
+    ```
+  </Accordion>
+
+  <Accordion title="check_for_gh_release - Check for updates">
+    ```bash
+    # Check if new version available
+    if check_for_gh_release "appname" "owner/repo"; then
+      msg_info "Updating to new version"
+      # Perform update
+    else
+      msg_ok "Already up to date"
+    fi
+    ```
+  </Accordion>
+
+  <Accordion title="Message Functions">
+    ```bash
+    msg_info "Installing dependencies"    # Blue info message
+    msg_ok "Installation complete"         # Green success message
+    msg_error "Installation failed"        # Red error message
+    msg_warn "Using default settings"     # Yellow warning message
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  See `docs/contribution/HELPER_FUNCTIONS.md` for a complete reference of all available helper functions.
+</Tip>
+
+## Update Script Implementation
+
+Every container script must include an `update_script()` function for in-place updates.
+
+### Standard Update Pattern
+
+<Steps>
+  <Step title="Check for New Release">
+    Use `check_for_gh_release` to skip unnecessary updates:
+    
+    ```bash
+    function update_script() {
+      header_info
+      check_container_storage
+      check_container_resources
+      
+      if check_for_gh_release "myapp" "owner/repo"; then
+        # Update available, proceed
+      else
+        msg_ok "Already running latest version"
+        exit
+      fi
+    ```
+  </Step>
+
+  <Step title="Stop Services">
+    ```bash
+      msg_info "Stopping Services"
+      systemctl stop myapp
+      msg_ok "Stopped Services"
+    ```
+  </Step>
+
+  <Step title="Backup Current Installation">
+    ```bash
+      msg_info "Backing up current installation"
+      mv /opt/myapp /opt/myapp.backup
+      msg_ok "Backup created"
+    ```
+  </Step>
+
+  <Step title="Deploy New Version">
+    ```bash
+      msg_info "Downloading latest version"
+      CLEAN_INSTALL=1 fetch_and_deploy_gh_release "myapp" "owner/repo" "tarball" "latest" "/opt/myapp"
+      msg_ok "Downloaded latest version"
+    ```
+  </Step>
+
+  <Step title="Restore Configuration">
+    ```bash
+      msg_info "Restoring configuration"
+      cp /opt/myapp.backup/.env /opt/myapp/.env
+      cp -r /opt/myapp.backup/uploads /opt/myapp/uploads
+      msg_ok "Configuration restored"
+    ```
+  </Step>
+
+  <Step title="Rebuild and Migrate">
+    ```bash
+      msg_info "Rebuilding application"
+      cd /opt/myapp
+      npm ci --production
+      npm run migrate
+      msg_ok "Application rebuilt"
+    ```
+  </Step>
+
+  <Step title="Restart Services">
+    ```bash
+      msg_info "Starting Services"
+      systemctl start myapp
+      msg_ok "Started Services"
+      
+      rm -rf /opt/myapp.backup
+      msg_ok "Updated Successfully!"
+    }
+    ```
+  </Step>
+</Steps>
+
+## Error Handling
+
+Proper error handling is critical for user experience.
+
+### Best Practices
+
+```bash
+# ✅ GOOD - Check critical operations
+if ! wget -q "${URL}"; then
+  msg_error "Failed to download file"
+  exit 1
+fi
+
+# ✅ GOOD - Use catch_errors for automatic trapping
+catch_errors  # Include early in script
+
+# ✅ GOOD - Validate before proceeding
+if [[ ! -d /opt/myapp ]]; then
+  msg_error "No ${APP} Installation Found!"
+  exit 1
+fi
+
+# ❌ BAD - Silently ignore failures
+wget $URL || true
+some_command 2>/dev/null
+
+# ❌ BAD - Continue on error
+wget $URL
+cd /opt/app  # Might fail if wget failed
+```
+
+## Pull Request Process
+
+### Cherry-Pick: Submitting Only Your Changes
+
+<Warning>
+  The `setup-fork.sh` script modifies 600+ files. You must use cherry-pick to submit ONLY your new files, not all the modified files.
+</Warning>
+
+<Steps>
+  <Step title="Create Clean Submission Branch">
+    ```bash
+    # Fetch latest upstream
+    git fetch upstream
+    
+    # Create clean branch from upstream main
+    git checkout -b submit/myapp upstream/main
+    ```
+  </Step>
+
+  <Step title="Copy Only Your Files">
+    ```bash
+    # Get your files from the work branch
+    git show feature/my-awesome-app:ct/myapp.sh > ct/myapp.sh
+    git show feature/my-awesome-app:install/myapp-install.sh > install/myapp-install.sh
+    git show feature/my-awesome-app:frontend/public/json/myapp.json > frontend/public/json/myapp.json
+    ```
+  </Step>
+
+  <Step title="Commit Only Your Changes">
+    ```bash
+    git add ct/myapp.sh install/myapp-install.sh frontend/public/json/myapp.json
+    git commit -m "feat: add MyApp container and install scripts"
+    ```
+  </Step>
+
+  <Step title="Verify Clean Diff">
+    ```bash
+    # Should show ONLY your 3 files
+    git diff upstream/main --name-only
+    ```
+    
+    Expected output:
+    ```
+    ct/myapp.sh
+    install/myapp-install.sh
+    frontend/public/json/myapp.json
+    ```
+  </Step>
+
+  <Step title="Push and Create PR">
+    ```bash
+    git push origin submit/myapp
+    
+    # Open PR on GitHub from: submit/myapp → community-scripts/ProxmoxVE/main
+    ```
+  </Step>
+</Steps>
+
+### PR Template
+
+Use this template when creating your pull request:
+
+```markdown
+## Description
+
+Brief description of what this PR adds or fixes.
+
+## Type of Change
+
+- [ ] New application (ct/ + install/ + json/)
+- [ ] Update existing application
+- [ ] Bug fix
+- [ ] Documentation update
+
+## Testing
+
+- [ ] Tested on Proxmox VE 8.x or 9.x
+- [ ] Container creation successful
+- [ ] Application installation successful
+- [ ] Application accessible at displayed URL
+- [ ] Update function works (if applicable)
+- [ ] Tested via curl from fork (not local files)
+
+## Application Details (for new apps)
+
+- **App Name**: MyApp
+- **Source**: https://github.com/owner/repo
+- **Default OS**: Debian 12
+- **Resources**: 2 CPU, 2GB RAM, 10GB Disk
+- **Access URL**: http://IP:PORT
+
+## Checklist
+
+- [ ] Follows coding standards
+- [ ] Self-reviewed code
+- [ ] ShellCheck shows no critical warnings
+- [ ] Only 3-4 files changed (cherry-picked correctly)
+```
+
+## Testing Checklist
+
+Before submitting your PR, verify:
+
+<Accordion title="Code Quality">
+  - [ ] Syntax valid: `bash -n ct/myapp.sh`
+  - [ ] ShellCheck clean: `shellcheck ct/myapp.sh install/myapp-install.sh`
+  - [ ] Naming conventions followed
+  - [ ] Consistent indentation (2 spaces)
+  - [ ] No trailing whitespace
+</Accordion>
+
+<Accordion title="Functionality">
+  - [ ] Container created successfully
+  - [ ] Installation completes without errors
+  - [ ] Application accessible at URL
+  - [ ] Update function detects new versions
+  - [ ] No temporary files left after install
+  - [ ] Services start automatically on boot
+</Accordion>
+
+<Accordion title="Documentation">
+  - [ ] Copyright header present
+  - [ ] APP variable matches filename
+  - [ ] Realistic default resource values
+  - [ ] Clear success message with access info
+  - [ ] JSON metadata complete and accurate
+</Accordion>
+
+<Accordion title="Security">
+  - [ ] Runs as unprivileged container (when possible)
+  - [ ] No hardcoded passwords in scripts
+  - [ ] Downloads from official sources only
+  - [ ] GPG verification where applicable
+</Accordion>
+
+## Common Mistakes to Avoid
+
+<Warning>
+  **Top mistakes that delay PR approval:**
+</Warning>
+
+1. **Testing locally instead of via curl** - Always test from GitHub URLs
+2. **Submitting 600+ modified files** - Use cherry-pick to submit only your files
+3. **Hardcoded versions** - Use GitHub API or package managers
+4. **No error handling** - Check return codes and use `catch_errors`
+5. **Missing update function** - Every container script needs `update_script()`
+6. **Unrealistic resource defaults** - Test minimum requirements
+7. **Unquoted variables** - Always use `"${VAR}"`
+8. **Testing without waiting for GitHub** - GitHub needs 10-30 seconds to update files
+
+## Code Review Process
+
+<Steps>
+  <Step title="Initial Review (1-2 weeks)">
+    Maintainers review your PR for:
+    - Adherence to coding standards
+    - Functionality and testing
+    - Security best practices
+    - Documentation completeness
+  </Step>
+
+  <Step title="Feedback and Iteration">
+    If changes are requested:
+    
+    ```bash
+    # Make requested changes
+    nano ct/myapp.sh
+    
+    # Commit and push
+    git add ct/myapp.sh
+    git commit -m "Address review feedback: improve error handling"
+    git push origin submit/myapp
+    
+    # PR updates automatically - no new PR needed
+    ```
+  </Step>
+
+  <Step title="Approval and Merge">
+    Once approved, maintainers will merge your PR. Your contribution is now live!
+  </Step>
+</Steps>
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card title="Template Files" icon="file-code">
+    - `docs/contribution/templates_ct/AppName.sh`
+    - `docs/contribution/templates_install/AppName-install.sh`
+    - `docs/contribution/templates_json/AppName.json`
+  </Card>
+  
+  <Card title="Helper Functions" icon="function">
+    - `docs/contribution/HELPER_FUNCTIONS.md`
+    - `misc/tools.func`
+    - `misc/install.func`
+  </Card>
+  
+  <Card title="Detailed Guides" icon="book">
+    - `docs/ct/DETAILED_GUIDE.md`
+    - `docs/install/DETAILED_GUIDE.md`
+    - `docs/contribution/GUIDE.md`
+  </Card>
+  
+  <Card title="Code Audit" icon="check">
+    - `docs/contribution/CODE-AUDIT.md`
+    - Review checklist
+    - Quality standards
+  </Card>
+</CardGroup>
+
+<Tip>
+  When in doubt, look at similar existing scripts in the repository. They provide excellent examples of proper implementation.
+</Tip>

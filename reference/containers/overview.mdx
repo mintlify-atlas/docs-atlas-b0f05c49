@@ -1,0 +1,295 @@
+---
+title: Container Scripts Overview
+description: Complete reference of 455+ LXC container installation scripts for Proxmox VE
+---
+
+## Introduction
+
+Proxmox VE Helper Scripts provides an extensive collection of **455+ automated installation scripts** for LXC containers. These scripts simplify the deployment of various applications, services, and development tools on Proxmox VE.
+
+## Script Types
+
+<CardGroup cols={3}>
+  <Card title="Debian-based" icon="debian" href="/reference/containers/debian-based">
+    424 scripts using Debian as the base OS
+  </Card>
+  <Card title="Alpine-based" icon="mountain" href="/reference/containers/alpine-based">
+    31 lightweight scripts using Alpine Linux
+  </Card>
+  <Card title="Turnkey" icon="server" href="/reference/containers/turnkey">
+    Pre-configured Turnkey Linux templates
+  </Card>
+</CardGroup>
+
+## Categories
+
+The container scripts are organized into the following categories:
+
+<Accordion title="Home Automation (50+)">
+  - **Home Assistant** - Open source home automation platform
+  - **ESPHome** - System for ESP8266/ESP32 devices
+  - **Node-RED** - Flow-based programming for IoT
+  - **Zigbee2MQTT** - Zigbee to MQTT bridge
+  - **Z-Wave JS UI** - Full-featured Z-Wave control panel
+  - **Homebridge** - HomeKit support for non-HomeKit devices
+  - **ioBroker** - IoT and home automation platform
+  - **FHEM** - Home automation server
+  - **openHAB** - Vendor-agnostic home automation
+  - **Jeedom** - Home automation solution
+  - And many more...
+</Accordion>
+
+<Accordion title="Media Management (60+)">
+  - **Plex** - Media server and streaming platform
+  - **Jellyfin** - Free media system
+  - **Emby** - Personal media server
+  - **Sonarr** - TV series management
+  - **Radarr** - Movie collection manager
+  - **Lidarr** - Music collection manager
+  - **Readarr** - Book and audiobook manager
+  - **Whisparr** - Adult content manager
+  - **Prowlarr** - Indexer manager
+  - **Bazarr** - Subtitle management
+  - **Jellyseerr/Overseerr** - Media request management
+  - **Tautulli** - Plex monitoring and tracking
+  - **Kavita** - Digital library and ebook reader
+  - **Komga** - Comic/manga media server
+  - **Audiobookshelf** - Audiobook and podcast server
+  - **Navidrome** - Music streaming server
+  - And many more...
+</Accordion>
+
+<Accordion title="Download Clients (20+)">
+  - **qBittorrent** - BitTorrent client
+  - **Transmission** - Lightweight BitTorrent client
+  - **Deluge** - Feature-rich BitTorrent client
+  - **SABnzbd** - Usenet binary downloader
+  - **NZBGet** - Efficient Usenet downloader
+  - **aria2** - Lightweight multi-protocol downloader
+  - **MeTube** - YouTube downloader
+  - **yt-dlp Web UI** - Web interface for yt-dlp
+  - **RDTClient** - Real-Debrid torrent client
+  - **Autobrr** - Modern torrent automation
+  - And more...
+</Accordion>
+
+<Accordion title="Networking & Security (40+)">
+  - **AdGuard Home** - Network-wide ad blocking
+  - **Pi-hole** - DNS sinkhole for ad blocking
+  - **WireGuard** - Fast VPN tunnel
+  - **Headscale** - Self-hosted Tailscale control server
+  - **Nginx Proxy Manager** - Reverse proxy manager
+  - **Traefik** - Modern HTTP reverse proxy
+  - **Caddy** - Powerful web server with automatic HTTPS
+  - **Cloudflared** - Cloudflare Tunnel client
+  - **Authentik/Authelia** - Identity providers and SSO
+  - **Vaultwarden** - Bitwarden-compatible password manager
+  - **Keycloak** - Identity and access management
+  - **Netbox** - IP address management (IPAM)
+  - **Gatus** - Service health monitoring
+  - **Uptime Kuma** - Self-hosted monitoring tool
+  - **Blocky** - Fast DNS proxy and ad-blocker
+  - And more...
+</Accordion>
+
+<Accordion title="Databases (15+)">
+  - **PostgreSQL** - Advanced relational database
+  - **MariaDB** - MySQL-compatible database
+  - **MySQL** - Popular relational database
+  - **MongoDB** - NoSQL document database
+  - **Redis** - In-memory data structure store
+  - **Valkey** - Redis fork
+  - **InfluxDB** - Time series database
+  - **Neo4j** - Graph database
+  - **Apache Cassandra** - Distributed NoSQL database
+  - **Apache CouchDB** - Document-oriented database
+  - **Meilisearch** - Lightning-fast search engine
+  - **Typesense** - Fast, typo-tolerant search engine
+  - **Qdrant** - Vector similarity search engine
+  - And more...
+</Accordion>
+
+<Accordion title="Development & DevOps (50+)">
+  - **Docker** - Container platform
+  - **Podman** - Daemonless container engine
+  - **Gitea** - Lightweight Git service
+  - **Forgejo** - Gitea fork
+  - **GitLab** - Complete DevOps platform
+  - **Jenkins** - Automation server
+  - **Semaphore** - Modern CI/CD
+  - **Dockge** - Docker Compose manager
+  - **Portainer** - Container management UI
+  - **Coolify** - Self-hostable Heroku alternative
+  - **Dokploy** - Deploy applications easily
+  - **n8n** - Workflow automation
+  - **Jupyter Notebook** - Interactive computing
+  - **Code Server** - VS Code in the browser
+  - **Grafana** - Analytics and monitoring
+  - **Prometheus** - Monitoring system
+  - **Loki** - Log aggregation system
+  - And more...
+</Accordion>
+
+<Accordion title="Productivity & Collaboration (40+)">
+  - **Nextcloud** - File sync and share platform
+  - **OnlyOffice** - Office suite
+  - **Docmost** - Collaborative documentation
+  - **BookStack** - Wiki and documentation platform
+  - **Wiki.js** - Modern wiki software
+  - **Outline** - Team knowledge base
+  - **Mattermost** - Team collaboration platform
+  - **Joplin Server** - Note-taking sync server
+  - **Memos** - Privacy-first memo hub
+  - **SilverBullet** - Note-taking application
+  - **Trilium** - Hierarchical note-taking
+  - **Excalidraw** - Virtual whiteboard
+  - **draw.io** - Diagramming tool
+  - **Planka** - Trello alternative
+  - **Vikunja** - Task and project management
+  - **Leantime** - Project management system
+  - And more...
+</Accordion>
+
+<Accordion title="Communication & Messaging (15+)">
+  - **Element Synapse** - Matrix homeserver
+  - **Mattermost** - Team messaging
+  - **The Lounge** - IRC web client
+  - **TeamSpeak Server** - Voice chat server
+  - **Rocket.Chat** - Team communication
+  - **Gotify** - Push notification server
+  - **ntfy** - Send notifications to phone
+  - **EMQX** - MQTT broker
+  - **HiveMQ** - Enterprise MQTT platform
+  - **MQTT** - Mosquitto MQTT broker
+  - **RabbitMQ** - Message broker
+  - And more...
+</Accordion>
+
+<Accordion title="Finance & Business (20+)">
+  - **Firefly III** - Personal finance manager
+  - **Actual Budget** - Local-first finance tool
+  - **Ghostfolio** - Wealth management
+  - **Invoice Ninja** - Invoicing platform
+  - **Dolibarr** - ERP and CRM
+  - **Odoo** - Business management suite
+  - **Kimai** - Time tracking
+  - **Limesurvey** - Survey platform
+  - **Metabase** - Business intelligence
+  - **NocoDB** - Airtable alternative
+  - **Grist** - Spreadsheet-database hybrid
+  - And more...
+</Accordion>
+
+<Accordion title="Smart Home Accessories (25+)">
+  - **Frigate** - NVR with AI object detection
+  - **MotionEye** - Video surveillance
+  - **Shinobi** - Video management
+  - **Agent DVR** - Video surveillance
+  - **deCONZ** - Zigbee gateway
+  - **TasmoAdmin** - Tasmota device management
+  - **TasmoCompiler** - Tasmota firmware compiler
+  - **EVCC** - EV charging controller
+  - **PS5-MQTT** - PlayStation 5 MQTT integration
+  - **OctoPrint** - 3D printer controller
+  - And more...
+</Accordion>
+
+<Accordion title="Web Services & Utilities (60+)">
+  - **WordPress** - Content management system
+  - **Ghost** - Publishing platform
+  - **Strapi** - Headless CMS
+  - **Umami** - Web analytics
+  - **Plausible** - Privacy-friendly analytics
+  - **LibreSpeed** - Speed test tool
+  - **Speedtest Tracker** - Internet performance tracking
+  - **ChangeDetection.io** - Website change monitoring
+  - **Uptime Kuma** - Uptime monitoring
+  - **Linkding** - Bookmark manager
+  - **Linkwarden** - Collaborative bookmark manager
+  - **Kutt** - URL shortener
+  - **PrivateBin** - Pastebin alternative
+  - **Stirling PDF** - PDF manipulation tool
+  - **IT Tools** - Collection of handy tools
+  - **Zipline** - ShareX media server
+  - **Immich** - Photo and video backup
+  - **PhotoPrism** - AI-powered photo app
+  - And more...
+</Accordion>
+
+<Accordion title="Game Servers & Gaming (10+)">
+  - **Crafty Controller** - Minecraft server manager
+  - **Pterodactyl Panel** - Game server management
+  - **Pelican Panel** - Game server control panel
+  - **TeamSpeak Server** - Voice communication
+  - **MineOS** - Minecraft server management
+  - And more...
+</Accordion>
+
+## Installation Methods
+
+<Tabs>
+  <Tab title="Interactive Menu">
+    The primary installation method uses an interactive menu system:
+
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/tteck/Proxmox/raw/main/ct/scriptname.sh)"
+    ```
+
+    This presents a dialog-based interface for configuring:
+    - Container resources (CPU, RAM, disk)
+    - Network settings
+    - Privileged vs unprivileged mode
+    - Advanced options
+  </Tab>
+
+  <Tab title="Advanced Mode">
+    For automated deployments or custom configurations:
+
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/tteck/Proxmox/raw/main/ct/scriptname.sh)" -s --verbose
+    ```
+
+    Additional flags:
+    - `--verbose` - Show detailed output
+    - `-s` - Skip interactive prompts (use defaults)
+  </Tab>
+</Tabs>
+
+## Script Features
+
+All container scripts include:
+
+- **Automatic Updates** - Built-in update mechanisms
+- **Post-Install Configuration** - Guided setup after deployment
+- **Resource Optimization** - Sensible defaults for container sizing
+- **Security Hardening** - Best practices applied by default
+- **Backup Integration** - Compatible with Proxmox backup solutions
+- **Documentation Links** - Direct links to official project docs
+
+## Common Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Media Server" icon="film">
+    Plex + Sonarr + Radarr + Prowlarr + qBittorrent stack for automated media management
+  </Card>
+  <Card title="Home Lab" icon="flask">
+    Docker + Portainer + Nginx Proxy Manager for containerized applications
+  </Card>
+  <Card title="Smart Home" icon="house">
+    Home Assistant + Node-RED + Zigbee2MQTT + Mosquitto MQTT for complete home automation
+  </Card>
+  <Card title="Self-Hosted Cloud" icon="cloud">
+    Nextcloud + OnlyOffice + Vaultwarden for personal cloud services
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Debian Scripts" icon="debian" href="/reference/containers/debian-based">
+    Browse 424 Debian-based container scripts
+  </Card>
+  <Card title="Alpine Scripts" icon="mountain" href="/reference/containers/alpine-based">
+    Browse 31 lightweight Alpine Linux scripts
+  </Card>
+</CardGroup>

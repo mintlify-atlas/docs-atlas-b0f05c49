@@ -1,0 +1,179 @@
+---
+title: VM Scripts Overview
+description: Complete reference for all available VM installation scripts in Proxmox VE Helper Scripts
+---
+
+VM scripts automate the creation of virtual machines in Proxmox VE. These scripts handle downloading OS images, configuring VM settings, and setting up initial configurations.
+
+## Available VM Categories
+
+<CardGroup cols={2}>
+  <Card title="Linux VMs" icon="linux" href="/reference/vms/linux-vms">
+    Debian, Ubuntu, Arch Linux, and general-purpose Linux VMs
+  </Card>
+  <Card title="Home Assistant OS" icon="home" href="/reference/vms/haos">
+    Home Assistant Operating System for home automation
+  </Card>
+  <Card title="Network Appliances" icon="network-wired" href="/reference/vms/network-appliances">
+    OPNsense, OpenWrt, MikroTik, and other network solutions
+  </Card>
+  <Card title="Storage & Apps" icon="server">
+    TrueNAS, Nextcloud, ownCloud, and other specialized VMs
+  </Card>
+</CardGroup>
+
+## All Available VM Scripts
+
+### Linux Operating Systems
+
+| Script | Description | Version |
+|--------|-------------|----------|
+| `debian-vm.sh` | Debian 12 (Bookworm) VM | 12 |
+| `debian-13-vm.sh` | Debian 13 (Trixie) VM | 13 |
+| `ubuntu2204-vm.sh` | Ubuntu 22.04 LTS (Jammy) VM | 22.04 |
+| `ubuntu2404-vm.sh` | Ubuntu 24.04 LTS (Noble) VM | 24.04 |
+| `ubuntu2504-vm.sh` | Ubuntu 25.04 (Plucky) VM | 25.04 |
+| `archlinux-vm.sh` | Arch Linux VM | Rolling |
+| `docker-vm.sh` | Docker-ready Linux VM | Latest |
+
+### Home Automation
+
+| Script | Description |
+|--------|-------------|
+| `haos-vm.sh` | Home Assistant OS (standard) |
+| `pimox-haos-vm.sh` | Home Assistant OS for Raspberry Pi |
+
+### Network Appliances
+
+| Script | Description | Version |
+|--------|-------------|----------|
+| `opnsense-vm.sh` | OPNsense Firewall | 25.7 |
+| `openwrt-vm.sh` | OpenWrt Router | Latest |
+| `mikrotik-routeros.sh` | MikroTik RouterOS CHR | Latest |
+
+### Storage & Cloud Solutions
+
+| Script | Description |
+|--------|-------------|
+| `truenas-vm.sh` | TrueNAS CORE storage solution |
+| `nextcloud-vm.sh` | Nextcloud file sharing platform |
+| `owncloud-vm.sh` | ownCloud file sharing platform |
+| `umbrel-os-vm.sh` | Umbrel OS home server |
+
+## How VM Scripts Work
+
+<Steps>
+  <Step title="Download the Script">
+    VM scripts are executed directly from the Proxmox VE shell using bash.
+  </Step>
+  
+  <Step title="Interactive Configuration">
+    Each script presents an interactive menu to configure:
+    - VM ID
+    - Hostname
+    - CPU cores
+    - RAM allocation
+    - Disk size
+    - Network settings
+    - Additional options specific to the VM type
+  </Step>
+  
+  <Step title="Automated Installation">
+    The script automatically:
+    - Downloads the OS image
+    - Creates the VM with specified settings
+    - Configures initial setup
+    - Starts the VM (optional)
+  </Step>
+  
+  <Step title="Post-Installation">
+    Access the VM console or web interface to complete any remaining setup.
+  </Step>
+</Steps>
+
+## General Usage Pattern
+
+All VM scripts follow this standard execution pattern:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/SCRIPT-NAME.sh)"
+```
+
+<Note>
+Replace `SCRIPT-NAME.sh` with the actual script filename from the tables above.
+</Note>
+
+## VM vs CT (Container)
+
+<AccordionGroup>
+  <Accordion title="When to use a VM">
+    - Need full kernel control
+    - Running non-Linux operating systems
+    - Require complete hardware virtualization
+    - Need specific kernel modules
+    - Running production network appliances
+  </Accordion>
+  
+  <Accordion title="When to use a Container (CT)">
+    - Running Linux applications
+    - Need better performance and lower overhead
+    - Want faster startup times
+    - Running multiple instances of same service
+    - Development and testing environments
+  </Accordion>
+</AccordionGroup>
+
+## Common Configuration Options
+
+Most VM scripts support these configurable options:
+
+- **VM ID**: Unique identifier (100-999999)
+- **Hostname**: VM name
+- **CPU Cores**: Number of virtual CPU cores
+- **RAM**: Memory allocation in MB/GB
+- **Disk Size**: Primary disk size
+- **Bridge**: Network bridge (vmbr0, vmbr1, etc.)
+- **MAC Address**: Automatically generated or custom
+- **Start on Boot**: Auto-start VM with Proxmox
+- **Start after Creation**: Immediately start the VM
+
+## Advanced Features
+
+### VLAN Support
+
+Many VM scripts support VLAN tagging for network isolation:
+
+```bash
+# During interactive setup, specify VLAN tag (e.g., 10, 100)
+```
+
+### SSH Key Injection
+
+Some Linux VM scripts support SSH key injection during creation for passwordless access.
+
+### Cloud-Init Support
+
+Certain VM scripts leverage cloud-init for automated configuration.
+
+## Requirements
+
+<Warning>
+- Proxmox VE 7.0 or higher
+- Sufficient storage space for VM images
+- Network connectivity to download images
+- Appropriate CPU architecture (most require x86_64/AMD64)
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Linux VMs" icon="linux" href="/reference/vms/linux-vms">
+    Explore Linux VM options
+  </Card>
+  <Card title="Home Assistant" icon="home" href="/reference/vms/haos">
+    Set up home automation
+  </Card>
+  <Card title="Network Appliances" icon="network-wired" href="/reference/vms/network-appliances">
+    Deploy network solutions
+  </Card>
+</CardGroup>

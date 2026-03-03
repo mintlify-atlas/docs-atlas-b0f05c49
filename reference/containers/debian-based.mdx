@@ -1,0 +1,730 @@
+---
+title: Debian-based Container Scripts
+description: Complete list of 424 LXC container scripts using Debian as the base operating system
+---
+
+## Overview
+
+Debian-based container scripts provide the widest compatibility and software availability. These scripts use Debian as the base operating system and are ideal for most applications.
+
+**Total Scripts: 424**
+
+## Installation
+
+```bash
+bash -c "$(wget -qLO - https://github.com/tteck/Proxmox/raw/main/ct/SCRIPTNAME.sh)"
+```
+
+Replace `SCRIPTNAME` with the script name (e.g., `homeassistant`, `plex`, `docker`).
+
+## Home Automation
+
+<AccordionGroup>
+  <Accordion title="Home Assistant & Related (15 scripts)">
+    - **homeassistant.sh** - Open source home automation platform with 2000+ integrations
+    - **esphome.sh** - System to control ESP8266/ESP32 devices
+    - **node-red.sh** - Flow-based programming for IoT and home automation
+    - **zigbee2mqtt.sh** - Zigbee to MQTT bridge for smart devices
+    - **zwave-js-ui.sh** - Full-featured Z-Wave control panel
+    - **deconz.sh** - deCONZ Zigbee gateway software
+    - **evcc.sh** - EV charging controller with solar integration
+    - **go2rtc.sh** - Ultimate camera streaming application
+    - **frigate.sh** - NVR with real-time AI object detection
+    - **scrypted.sh** - Home video integration platform
+    - **ioBroker** - Platform for IoT and home automation
+    - **fhem.sh** - Perl-based home automation server
+    - **openhab.sh** - Vendor and technology agnostic home automation
+    - **jeedom.sh** - Open source home automation solution
+    - **homebridge.sh** - HomeKit support for non-HomeKit accessories
+  </Accordion>
+
+  <Accordion title="Smart Home Accessories (20+ scripts)">
+    - **motioneye.sh** - Web-based frontend for motion detection
+    - **shinobi.sh** - Open source video management solution
+    - **agentdvr.sh** - Video surveillance with AI
+    - **tasmoadmin.sh** - Administrative website for Tasmota devices
+    - **tasmocompiler.sh** - Compile custom Tasmota firmware
+    - **octoprint.sh** - 3D printer web interface
+    - **ps5-mqtt.sh** - PlayStation 5 MQTT integration
+    - **teddycloud.sh** - Alternative cloud for Toniebox
+    - **hyperion.sh** - Ambient lighting for TV and monitors
+    - **hyperhdr.sh** - HDR-capable ambient lighting
+    - **magicmirror.sh** - Smart mirror platform
+  </Accordion>
+</AccordionGroup>
+
+## Media Management
+
+<AccordionGroup>
+  <Accordion title="Media Servers (10 scripts)">
+    - **plex.sh** - Plex Media Server for streaming media
+    - **jellyfin.sh** - Free software media system
+    - **emby.sh** - Personal media server with apps
+    - **kodi.sh** - Media player application
+    - **navidrome.sh** - Modern music server and streamer
+    - **audiobookshelf.sh** - Audiobook and podcast server
+    - **lyrionmusicserver.sh** - Logitech Media Server fork
+    - **ampache.sh** - Web-based audio streaming
+    - **koel.sh** - Personal music streaming service
+    - **mstream.sh** - Music streaming server
+  </Accordion>
+
+  <Accordion title="Media Automation (25+ scripts)">
+    - **sonarr.sh** - PVR for Usenet and BitTorrent (TV shows)
+    - **radarr.sh** - Movie collection manager for Usenet and BitTorrent
+    - **lidarr.sh** - Music collection manager
+    - **readarr.sh** - Book and audiobook collection manager
+    - **whisparr.sh** - Adult content management
+    - **prowlarr.sh** - Indexer manager/proxy for *arr apps
+    - **bazarr.sh** - Subtitle management for Sonarr and Radarr
+    - **overseerr.sh** - Request management for Plex
+    - **jellyseerr.sh** - Request management for Jellyfin
+    - **tautulli.sh** - Monitoring and tracking for Plex
+    - **recyclarr.sh** - Sync TRaSH guides to *arr apps
+    - **autobrr.sh** - Modern, configurable torrent automation
+    - **cross-seed.sh** - Automatically find cross-seeds
+    - **notifiarr.sh** - Notification client for *arr apps
+    - **kometa.sh** - Python-based Plex metadata manager
+    - **tdarr.sh** - Distributed transcoding system
+    - **unmanic.sh** - Library optimizer for video files
+    - **fileflows.sh** - Automated file processing
+    - **ersatztv.sh** - Live TV channel builder for Plex/Jellyfin
+    - **tunarr.sh** - Create custom TV channels
+    - **threadfin.sh** - M3U proxy for IPTV
+    - **channels.sh** - DVR for cord-cutters
+  </Accordion>
+
+  <Accordion title="Media Libraries & Readers (15 scripts)">
+    - **kavita.sh** - Digital library supporting comics, manga, books
+    - **komga.sh** - Media server for comics/mangas/BDs
+    - **calibre-web.sh** - Web app for browsing Calibre libraries
+    - **lazylibrarian.sh** - Audiobook and ebook manager
+    - **mylar3.sh** - Automated comic book downloader
+    - **kapowarr.sh** - Comic book download manager
+    - **bookstack.sh** - Platform for organizing documentation
+    - **audiobookshelf.sh** - Self-hosted audiobook server
+    - **libation.sh** - Audible audiobook manager
+    - **booksonic.sh** - Audiobook streaming server
+    - **readeck.sh** - Simple web app to save articles
+    - **wallabag.sh** - Save and classify articles
+    - **archivebox.sh** - Self-hosted internet archiving
+  </Accordion>
+</AccordionGroup>
+
+## Download Clients
+
+<Accordion title="BitTorrent & Usenet (15+ scripts)">
+  - **qbittorrent.sh** - Feature-rich BitTorrent client
+  - **transmission.sh** - Fast, lightweight BitTorrent client
+  - **deluge.sh** - Full-featured BitTorrent application
+  - **sabnzbd.sh** - Automated Usenet binary downloader
+  - **nzbget.sh** - Efficient Usenet downloader
+  - **aria2.sh** - Lightweight multi-protocol download utility
+  - **metube.sh** - Web GUI for youtube-dl
+  - **yt-dlp-webui.sh** - Web interface for yt-dlp
+  - **rdtclient.sh** - Web interface for Real-Debrid torrents
+  - **slskd.sh** - Soulseek client
+  - **pyload.sh** - Download manager written in Python
+  - **jdownloader.sh** - Download management tool
+</Accordion>
+
+## Networking & Security
+
+<AccordionGroup>
+  <Accordion title="DNS & Ad Blocking (8 scripts)">
+    - **adguard.sh** - Network-wide ad and tracker blocking
+    - **pihole.sh** - Network-level advertisement and tracker blocker
+    - **blocky.sh** - Fast and lightweight DNS proxy
+    - **technitiumdns.sh** - Authoritative and recursive DNS server
+    - **unbound.sh** - Validating, recursive DNS resolver
+    - **powerdns.sh** - Authoritative DNS server
+    - **cloudflare-ddns.sh** - Cloudflare dynamic DNS updater
+    - **domain-monitor.sh** - Monitor domain expiration
+  </Accordion>
+
+  <Accordion title="VPN & Tunneling (8 scripts)">
+    - **wireguard.sh** - Fast, modern VPN tunnel
+    - **headscale.sh** - Self-hosted Tailscale control server
+    - **cloudflared.sh** - Cloudflare Tunnel client
+    - **openziti-controller.sh** - Zero trust networking controller
+    - **openziti-tunnel.sh** - OpenZiti tunnel endpoint
+    - **twingate-connector.sh** - Zero trust network access
+    - **zerotier-one.sh** - Smart Ethernet switch for Earth
+    - **hev-socks5-server.sh** - High-performance SOCKS5 server
+  </Accordion>
+
+  <Accordion title="Reverse Proxy & Web Servers (10 scripts)">
+    - **nginxproxymanager.sh** - Nginx reverse proxy with UI
+    - **npmplus.sh** - Nginx Proxy Manager Plus
+    - **traefik.sh** - Modern HTTP reverse proxy and load balancer
+    - **caddy.sh** - Web server with automatic HTTPS
+    - **haproxy.sh** - High availability load balancer
+    - **nginx-ui.sh** - Nginx management interface
+    - **bunkerweb.sh** - Security-focused nginx container
+    - **apache-tomcat.sh** - Java servlet container
+  </Accordion>
+
+  <Accordion title="Authentication & Identity (10 scripts)">
+    - **authelia.sh** - Single sign-on and multi-factor portal
+    - **authentik.sh** - Identity provider focused on flexibility
+    - **keycloak.sh** - Open source identity and access management
+    - **vaultwarden.sh** - Bitwarden-compatible password manager
+    - **passbolt.sh** - Password manager for teams
+    - **lldap.sh** - Light LDAP implementation
+    - **2fauth.sh** - Two-factor authentication web app
+    - **tinyauth.sh** - Minimal authentication service
+    - **oauth2-proxy.sh** - Reverse proxy for OAuth 2.0
+    - **zitadel.sh** - Identity infrastructure platform
+  </Accordion>
+
+  <Accordion title="Monitoring & Analytics (20+ scripts)">
+    - **uptimekuma.sh** - Fancy self-hosted monitoring tool
+    - **gatus.sh** - Automated service health dashboard
+    - **healthchecks.sh** - Cron job monitoring service
+    - **grafana.sh** - Open source analytics and monitoring
+    - **prometheus.sh** - Monitoring system and time series database
+    - **prometheus-alertmanager.sh** - Alert handling for Prometheus
+    - **prometheus-blackbox-exporter.sh** - Probing endpoints
+    - **prometheus-pve-exporter.sh** - Proxmox VE metrics exporter
+    - **loki.sh** - Log aggregation system by Grafana
+    - **telegraf.sh** - Plugin-driven metrics collector
+    - **victoriametrics.sh** - Fast time series database
+    - **netdata.sh** - Real-time performance monitoring
+    - **checkmk.sh** - IT infrastructure monitoring
+    - **zabbix.sh** - Enterprise monitoring solution
+    - **librenms.sh** - Network monitoring system
+    - **smokeping.sh** - Network latency monitor
+    - **pialert.sh** - Network device monitoring
+    - **watchyourlan.sh** - Lightweight network IP scanner
+  </Accordion>
+</AccordionGroup>
+
+## Databases
+
+<Accordion title="SQL & NoSQL (18 scripts)">
+  - **postgresql.sh** - Advanced open source relational database
+  - **mariadb.sh** - MySQL-compatible relational database
+  - **mysql.sh** - Popular open source database
+  - **mongodb.sh** - Document-oriented NoSQL database
+  - **redis.sh** - In-memory data structure store
+  - **valkey.sh** - High-performance key-value store (Redis fork)
+  - **influxdb.sh** - Time series database
+  - **neo4j.sh** - Graph database management system
+  - **apache-cassandra.sh** - Distributed NoSQL database
+  - **apache-couchdb.sh** - Document-oriented database
+  - **meilisearch.sh** - Lightning-fast search engine
+  - **typesense.sh** - Fast, typo-tolerant search engine
+  - **qdrant.sh** - Vector similarity search engine
+  - **opensearch.sh** - Search and analytics suite
+  - **elasticsearch.sh** - Distributed search engine
+  - **sqlserver2022.sh** - Microsoft SQL Server 2022
+  - **sqlserver2025.sh** - Microsoft SQL Server 2025
+  - **seaweedfs.sh** - Distributed file system
+</Accordion>
+
+## Development & DevOps
+
+<AccordionGroup>
+  <Accordion title="Version Control & CI/CD (15 scripts)">
+    - **gitea.sh** - Painless self-hosted Git service
+    - **forgejo.sh** - Lightweight software forge (Gitea fork)
+    - **gitlab.sh** - Complete DevOps platform
+    - **gitea-mirror.sh** - Gitea repository mirror tool
+    - **jenkins.sh** - Automation server for CI/CD
+    - **semaphore.sh** - Modern UI for Ansible
+    - **onedev.sh** - Self-hosted Git server with CI/CD
+    - **woodpecker-ci.sh** - Simple yet powerful CI/CD engine
+    - **drone.sh** - Container-native CI/CD platform
+  </Accordion>
+
+  <Accordion title="Container Management (12 scripts)">
+    - **docker.sh** - Container platform
+    - **podman.sh** - Daemonless container engine
+    - **podman-homeassistant.sh** - Home Assistant in Podman
+    - **dockge.sh** - Docker Compose manager with UI
+    - **portainer.sh** - Container management platform
+    - **yacht.sh** - Container management UI
+    - **cosmos.sh** - Self-hosted platform for Docker
+    - **casaos.sh** - Simple home cloud system
+    - **runtipi.sh** - Home server management
+    - **umbrel.sh** - Personal server OS
+  </Accordion>
+
+  <Accordion title="Deployment & Hosting (15 scripts)">
+    - **coolify.sh** - Self-hostable Heroku/Netlify alternative
+    - **dokploy.sh** - Deploy applications with ease
+    - **seelf.sh** - Deploy and manage applications
+    - **caprover.sh** - PaaS platform for developers
+    - **cloudron.sh** - Platform to run apps on your server
+    - **pterodactyl-panel.sh** - Game server management panel
+    - **pterodactyl-wings.sh** - Server control plane for Pterodactyl
+    - **pelican-panel.sh** - Game server management
+    - **pelican-wings.sh** - Wings daemon for Pelican
+    - **swizzin.sh** - Modular seedbox solution
+  </Accordion>
+
+  <Accordion title="Development Tools (20+ scripts)">
+    - **code-server.sh** - VS Code in the browser
+    - **jupyter-notebook.sh** - Interactive computing environment
+    - **livebook.sh** - Interactive notebook for Elixir
+    - **n8n.sh** - Workflow automation tool
+    - **windmill.sh** - Fast workflow engine
+    - **activepieces.sh** - No-code automation platform
+    - **huginn.sh** - System for building agents
+    - **nodered.sh** - Flow-based programming
+    - **pocketbase.sh** - Open source Firebase alternative
+    - **supabase.sh** - Open source Firebase alternative
+    - **appwrite.sh** - Backend server for mobile and web
+    - **hasura.sh** - GraphQL engine
+  </Accordion>
+</AccordionGroup>
+
+## Productivity & Collaboration
+
+<AccordionGroup>
+  <Accordion title="File Storage & Sync (15 scripts)">
+    - **nextcloud.sh** - Self-hosted productivity platform
+    - **nextcloudpi.sh** - Nextcloud optimized for Raspberry Pi
+    - **owncloud.sh** - File sync and share
+    - **seafile.sh** - File hosting platform
+    - **syncthing.sh** - Continuous file synchronization
+    - **filebrowser.sh** - Web file manager
+    - **filestash.sh** - Web client for cloud storage
+    - **cloudreve.sh** - Cloud storage system
+    - **minio.sh** - High-performance object storage
+    - **garage.sh** - Distributed object storage
+    - **rclone.sh** - Command line cloud storage manager
+    - **duplicati.sh** - Backup client with encryption
+    - **resilio-sync.sh** - Fast, reliable file sync
+    - **backrest.sh** - Modern backup solution
+  </Accordion>
+
+  <Accordion title="Documentation & Wikis (15 scripts)">
+    - **bookstack.sh** - Simple wiki platform
+    - **wikijs.sh** - Modern wiki app
+    - **dokuwiki.sh** - Simple wiki software
+    - **outline.sh** - Team knowledge base
+    - **docmost.sh** - Collaborative documentation
+    - **hedgedoc.sh** - Collaborative markdown editor
+    - **etherpad.sh** - Real-time collaborative editor
+    - **tiddlywiki.sh** - Non-linear notebook
+    - **xwiki.sh** - Enterprise wiki platform
+    - **bluespice.sh** - Enterprise MediaWiki distribution
+  </Accordion>
+
+  <Accordion title="Note-Taking (12 scripts)">
+    - **joplin-server.sh** - Note-taking sync server
+    - **trilium.sh** - Hierarchical note-taking application
+    - **silverbullet.sh** - Markdown-based note-taking
+    - **memos.sh** - Privacy-first, lightweight memo hub
+    - **flatnotes.sh** - Simple note-taking web app
+    - **standardnotes.sh** - Encrypted notes app
+    - **logseq.sh** - Privacy-first knowledge base
+    - **obsidian-livesync.sh** - Self-hosted sync for Obsidian
+    - **bentonote.sh** - Note-taking application
+  </Accordion>
+
+  <Accordion title="Project Management (15 scripts)">
+    - **planka.sh** - Trello-like project board
+    - **focalboard.sh** - Project management tool
+    - **taiga.sh** - Agile project management
+    - **openproject.sh** - Project management software
+    - **wekan.sh** - Open source kanban board
+    - **vikunja.sh** - To-do app with kanban boards
+    - **leantime.sh** - Project management system
+    - **plane.sh** - Project management tool
+    - **huly.sh** - All-in-one project management
+    - **youtrack.sh** - Issue tracking and project management
+  </Accordion>
+
+  <Accordion title="Office & Productivity (10 scripts)">
+    - **onlyoffice.sh** - Office suite for collaboration
+    - **collabora.sh** - LibreOffice-based online office
+    - **cryptpad.sh** - Encrypted collaboration suite
+    - **etherpad.sh** - Real-time collaborative editor
+    - **excalidraw.sh** - Virtual whiteboard
+    - **drawio.sh** - Diagramming application
+    - **diagrams.sh** - Draw.io alternative
+  </Accordion>
+</AccordionGroup>
+
+## Communication
+
+<Accordion title="Chat & Messaging (15 scripts)">
+  - **elementsynapse.sh** - Matrix homeserver implementation
+  - **mattermost.sh** - Team collaboration platform
+  - **rocketchat.sh** - Team communication platform
+  - **zulip.sh** - Team chat with threaded conversations
+  - **thelounge.sh** - Self-hosted web IRC client
+  - **gotify.sh** - Simple server for push notifications
+  - **ntfy.sh** - Send push notifications to phone
+  - **apprise.sh** - Push notifications to many services
+  - **pushover.sh** - Real-time notifications
+  - **synapse-admin.sh** - Admin UI for Matrix Synapse
+</Accordion>
+
+## Finance & Business
+
+<AccordionGroup>
+  <Accordion title="Personal Finance (10 scripts)">
+    - **firefly.sh** - Personal finance manager
+    - **actualbudget.sh** - Local-first personal finance tool
+    - **ghostfolio.sh** - Wealth management software
+    - **maybe.sh** - Personal finance and wealth management
+    - **家計簿 (kakeibo).sh** - Japanese budgeting method app
+    - **budgetzen.sh** - Simple budget tracking
+    - **wallos.sh** - Subscription tracking
+    - **investbrain.sh** - Investment tracking
+    - **wealthfolio.sh** - Portfolio tracker
+  </Accordion>
+
+  <Accordion title="Business & ERP (15 scripts)">
+    - **invoiceninja.sh** - Invoicing and time tracking
+    - **dolibarr.sh** - ERP and CRM suite
+    - **odoo.sh** - Business management software
+    - **erpnext.sh** - Open source ERP
+    - **crater.sh** - Invoicing platform
+    - **akaunting.sh** - Accounting software
+    - **kimai.sh** - Time tracking application
+    - **clockify.sh** - Time tracker and timesheet app
+    - **paymenter.sh** - Payment and client management
+    - **snipeit.sh** - IT asset management
+    - **part-db.sh** - Electronic part management
+    - **inventree.sh** - Inventory management
+  </Accordion>
+</AccordionGroup>
+
+## Web Services & CMS
+
+<AccordionGroup>
+  <Accordion title="Content Management (15 scripts)">
+    - **wordpress.sh** - Popular CMS platform
+    - **ghost.sh** - Modern publishing platform
+    - **strapi.sh** - Headless CMS
+    - **directus.sh** - Data platform and headless CMS
+    - **payload.sh** - Headless CMS and application framework
+    - **wagtail.sh** - Django-based CMS
+    - **grav.sh** - Flat-file CMS
+    - **writefreely.sh** - Federated blogging platform
+    - **bludit.sh** - Simple flat-file CMS
+  </Accordion>
+
+  <Accordion title="Analytics & Monitoring (12 scripts)">
+    - **umami.sh** - Simple, privacy-focused web analytics
+    - **plausible.sh** - Lightweight and privacy-friendly analytics
+    - **matomo.sh** - Powerful web analytics platform
+    - **shynet.sh** - Modern, privacy-friendly analytics
+    - **ackee.sh** - Self-hosted analytics tool
+    - **posthog.sh** - Product analytics platform
+    - **tianji.sh** - Website analytics and status monitoring
+    - **openobserve.sh** - Cloud-native observability platform
+    - **signoz.sh** - Application monitoring platform
+    - **highlight.sh** - Error monitoring and session replay
+  </Accordion>
+
+  <Accordion title="URL & Link Management (10 scripts)">
+    - **linkding.sh** - Bookmark manager
+    - **linkwarden.sh** - Collaborative bookmark manager
+    - **shiori.sh** - Bookmark manager
+    - **kutt.sh** - Modern URL shortener
+    - **shlink.sh** - Self-hosted URL shortener
+    - **yourls.sh** - URL shortening service
+    - **linkace.sh** - Bookmark archive
+    - **linkstack.sh** - Link sharing platform
+  </Accordion>
+</AccordionGroup>
+
+## Utilities & Tools
+
+<AccordionGroup>
+  <Accordion title="File Sharing & Upload (15 scripts)">
+    - **zipline.sh** - ShareX file upload server
+    - **pingvin-share.sh** - File sharing platform
+    - **pairdrop.sh** - Local file sharing in browser
+    - **snapdrop.sh** - Local file sharing
+    - **projectsend.sh** - Clients-oriented file upload utility
+    - **psitransfer.sh** - Simple file sharing
+    - **gokapi.sh** - Lightweight file sharing server
+    - **jirafeau.sh** - File sharing web app
+    - **lufi.sh** - Encrypted file sharing
+    - **privatebin.sh** - Encrypted pastebin
+    - **wastebin.sh** - Minimalist pastebin
+    - **rustypaste.sh** - Minimal file upload service
+  </Accordion>
+
+  <Accordion title="PDF & Document Tools (8 scripts)">
+    - **stirling-pdf.sh** - Powerful PDF manipulation tool
+    - **bentopdf.sh** - PDF generation service
+    - **documenso.sh** - Open source DocuSign alternative
+    - **paperless-ngx.sh** - Document management system
+    - **paperless-gpt.sh** - AI-enhanced paperless
+    - **paperless-ai.sh** - Paperless with AI features
+    - **apache-tika.sh** - Content analysis toolkit
+  </Accordion>
+
+  <Accordion title="QR Codes & Short Links (5 scripts)">
+    - **qrcode.sh** - QR code generator
+    - **url-shortener.sh** - Simple URL shortener
+    - **polr.sh** - Modern URL shortener
+  </Accordion>
+
+  <Accordion title="Developer Utilities (20+ scripts)">
+    - **it-tools.sh** - Collection of handy online tools
+    - **cyberchef.sh** - Cyber operations tool
+    - **stirling-tools.sh** - Collection of office tools
+    - **opengist.sh** - Self-hosted pastebin
+    - **snippet-box.sh** - Code snippet organizer
+    - **hastebin.sh** - Simple pastebin
+    - **codeserver.sh** - VS Code in browser
+    - **gitpod.sh** - Cloud development environment
+    - **eclipse-che.sh** - Cloud IDE
+  </Accordion>
+</AccordionGroup>
+
+## AI & Machine Learning
+
+<Accordion title="AI Services (15+ scripts)">
+  - **ollama.sh** - Run large language models locally
+  - **openwebui.sh** - Web UI for Ollama and OpenAI APIs
+  - **litellm.sh** - LLM proxy server
+  - **localai.sh** - Self-hosted OpenAI alternative
+  - **librechat.sh** - Enhanced ChatGPT clone
+  - **comfyui.sh** - Stable Diffusion GUI
+  - **stable-diffusion.sh** - AI image generation
+  - **text-generation-webui.sh** - Gradio web UI for LLMs
+  - **langflow.sh** - LangChain visual framework
+  - **flowise.sh** - Drag and drop LLM flows
+  - **flowiseai.sh** - Build LLM apps visually
+  - **anything-llm.sh** - All-in-one AI desktop application
+  - **libretranslate.sh** - Machine translation API
+  - **languagetool.sh** - Proofreading and grammar checker
+</Accordion>
+
+## Gaming & Entertainment
+
+<AccordionGroup>
+  <Accordion title="Game Servers (10 scripts)">
+    - **crafty-controller.sh** - Minecraft server wrapper
+    - **pterodactyl-panel.sh** - Game server management
+    - **pelican-panel.sh** - Game server control
+    - **amp.sh** - Application management panel
+    - **teamspeak-server.sh** - Voice communication server
+    - **mumble-server.sh** - Low-latency voice chat
+    - **foundry-vtt.sh** - Virtual tabletop gaming
+  </Accordion>
+
+  <Accordion title="Entertainment (8 scripts)">
+    - **owncast.sh** - Self-hosted live streaming
+    - **peertube.sh** - Decentralized video platform
+    - **tube-archivist.sh** - YouTube media server
+    - **channels.sh** - Live TV DVR
+    - **tvheadend.sh** - TV streaming server
+    - **pf2etools.sh** - Pathfinder 2e tools
+    - **dnd5etools.sh** - D&D 5th edition tools
+  </Accordion>
+</AccordionGroup>
+
+## Specialized Applications
+
+<AccordionGroup>
+  <Accordion title="Photography & Images (8 scripts)">
+    - **immich.sh** - High-performance photo and video backup
+    - **photoprism.sh** - AI-powered photo management
+    - **piwigo.sh** - Photo gallery software
+    - **lychee.sh** - Self-hosted photo management
+    - **librephotos.sh** - Photo management with AI
+    - **pixelfed.sh** - Photo sharing platform
+  </Accordion>
+
+  <Accordion title="Health & Fitness (8 scripts)">
+    - **babybuddy.sh** - Baby care tracking
+    - **mealie.sh** - Recipe manager and meal planner
+    - **tandoor.sh** - Recipe manager
+    - **grocyish.sh** - Grocery and household management
+    - **grocy.sh** - ERP for your kitchen
+    - **endurain.sh** - Fitness tracking
+    - **sparkyfitness.sh** - Workout tracking
+    - **wger.sh** - Fitness and workout manager
+  </Accordion>
+
+  <Accordion title="Travel & Lifestyle (10 scripts)">
+    - **dawarich.sh** - Self-hosted location tracking
+    - **wanderer.sh** - Travel planning and tracking
+    - **trip.sh** - Travel expense tracking
+    - **adventurelog.sh** - Travel journal
+    - **mealie.sh** - Meal and recipe planning
+    - **grocy.sh** - Household inventory management
+    - **homebox.sh** - Home inventory system
+  </Accordion>
+
+  <Accordion title="Education & Reference (10 scripts)">
+    - **wikijs.sh** - Modern wiki application
+    - **bookstack.sh** - Documentation platform
+    - **anki-sync-server.sh** - Flashcard sync server
+    - **moodle.sh** - Learning management system
+    - **canvas-lms.sh** - Learning management platform
+    - **openedx.sh** - Online learning platform
+  </Accordion>
+
+  <Accordion title="Genealogy & History (5 scripts)">
+    - **gramps-web.sh** - Web app for genealogy
+    - **webtrees.sh** - Online genealogy application
+    - **family-tree.sh** - Family tree software
+  </Accordion>
+
+  <Accordion title="Ham Radio & Communication (5 scripts)">
+    - **wavelog.sh** - Web-based amateur radio logging
+    - **cloudlog.sh** - Ham radio logbook
+    - **qrz-logbook.sh** - QRZ logbook interface
+  </Accordion>
+
+  <Accordion title="Plants & Gardening (5 scripts)">
+    - **plant-it.sh** - Self-hosted plant tracking
+    - **hortusfox.sh** - Plant management system
+    - **opensprinkler.sh** - Irrigation controller
+  </Accordion>
+</AccordionGroup>
+
+## System & Infrastructure
+
+<AccordionGroup>
+  <Accordion title="Proxmox Tools (8 scripts)">
+    - **proxmox-backup-server.sh** - Backup solution for Proxmox
+    - **proxmox-datacenter-manager.sh** - Multi-cluster management
+    - **proxmox-mail-gateway.sh** - Email security gateway
+    - **pve-scripts-local.sh** - Local helper scripts
+  </Accordion>
+
+  <Accordion title="System Management (15+ scripts)">
+    - **cockpit.sh** - Web-based server management
+    - **webmin.sh** - Web-based system administration
+    - **omv.sh** - OpenMediaVault NAS solution
+    - **truenas-scale.sh** - Storage operating system
+    - **xigmanas.sh** - Network-attached storage
+    - **opnsense.sh** - Firewall and routing platform
+    - **pfsense.sh** - Network security solution
+  </Accordion>
+
+  <Accordion title="Backup & Sync (10 scripts)">
+    - **duplicati.sh** - Backup software with encryption
+    - **urbackup.sh** - Client/server backup system
+    - **restic.sh** - Fast, secure backup program
+    - **borg.sh** - Deduplicating backup
+    - **kopia.sh** - Fast and secure backup tool
+    - **backrest.sh** - Modern backup solution
+    - **daemonsync.sh** - File synchronization daemon
+  </Accordion>
+</AccordionGroup>
+
+## Miscellaneous
+
+<AccordionGroup>
+  <Accordion title="Collections & Tracking (20+ scripts)">
+    - **romm.sh** - ROM manager for retro games
+    - **manyfold.sh** - 3D model manager
+    - **koillection.sh** - Collection management
+    - **booklore.sh** - Book collection manager
+    - **shelfmark.sh** - Bookmark and reading list
+    - **karakeep.sh** - Karaoke song management
+    - **bar-assistant.sh** - Cocktail recipe manager
+    - **lubelogger.sh** - Vehicle service tracking
+    - **warracker.sh** - Warranty tracking
+    - **watcharr.sh** - Content tracking for media
+  </Accordion>
+
+  <Accordion title="Task & Time Management (15 scripts)">
+    - **vikunja.sh** - To-do lists and kanban boards
+    - **tasks.sh** - Simple task management
+    - **tududi.sh** - Minimalist to-do app
+    - **donetick.sh** - Task and chore tracker
+    - **managemydamnlife.sh** - Life management dashboard
+    - **kimai.sh** - Time tracking
+    - **clockify.sh** - Time tracking software
+    - **traggo.sh** - Tag-based time tracking
+  </Accordion>
+
+  <Accordion title="Social & Community (10 scripts)">
+    - **mastodon.sh** - Decentralized social network
+    - **lemmy.sh** - Link aggregator and forum
+    - **pixelfed.sh** - Photo sharing platform
+    - **peertube.sh** - Video platform
+    - **funkwhale.sh** - Music server and platform
+    - **writefreely.sh** - Federated blogging
+    - **nodebb.sh** - Forum software
+    - **flarum.sh** - Modern forum software
+    - **discourse.sh** - Community discussion platform
+  </Accordion>
+
+  <Accordion title="Shopping & Wishlist (8 scripts)">
+    - **wishlist.sh** - Gift wishlist manager
+    - **giftlist.sh** - Gift tracking application
+    - **registry.sh** - Gift registry platform
+  </Accordion>
+
+  <Accordion title="Creative Tools (10 scripts)">
+    - **drawio.sh** - Diagramming and whiteboarding
+    - **excalidraw.sh** - Virtual collaborative whiteboard
+    - **tldraw.sh** - Collaborative digital whiteboard
+    - **penpot.sh** - Design and prototyping platform
+    - **revealjs.sh** - HTML presentation framework
+  </Accordion>
+
+  <Accordion title="Other Utilities (20+ scripts)">
+    - **speedtest-tracker.sh** - Internet performance tracking
+    - **librespeed-rust.sh** - Speed test server
+    - **changedetection.sh** - Website change monitoring
+    - **web-check.sh** - Website analysis tool
+    - **glance.sh** - Self-hosted dashboard
+    - **heimdall-dashboard.sh** - Application dashboard
+    - **homarr.sh** - Customizable dashboard
+    - **homepage.sh** - Modern application dashboard
+    - **homer.sh** - Static application dashboard
+    - **mafl.sh** - Minimalist flexible homepage
+    - **fluid-calendar.sh** - Calendar application
+    - **calendso.sh** - Scheduling infrastructure
+    - **rallly.sh** - Meeting poll tool
+    - **ots.sh** - One-time secret sharing
+    - **minarca.sh** - Backup software
+    - **beszel.sh** - Lightweight server monitoring
+    - **pulse.sh** - Application monitoring
+    - **checkmate.sh** - Website monitoring
+    - **argus.sh** - Service monitoring
+    - **guardian.sh** - Security monitoring
+  </Accordion>
+</AccordionGroup>
+
+## Base Templates
+
+<Accordion title="Base Operating Systems (3 scripts)">
+  - **debian.sh** - Debian base container
+  - **ubuntu.sh** - Ubuntu base container
+  - **alpine.sh** - Alpine Linux base (minimal)
+</Accordion>
+
+## Usage Tips
+
+<CardGroup cols={2}>
+  <Card title="Resource Allocation" icon="memory">
+    Most Debian containers require 512MB-1GB RAM minimum. Adjust based on application load.
+  </Card>
+  <Card title="Storage" icon="hard-drive">
+    Allocate 4-8GB minimum for most applications. Media servers need significantly more.
+  </Card>
+  <Card title="Networking" icon="network-wired">
+    Use static IPs for services that other containers depend on (DNS, databases, etc.)
+  </Card>
+  <Card title="Updates" icon="arrows-rotate">
+    Many scripts include update utilities. Check /usr/local/bin/ for update scripts.
+  </Card>
+</CardGroup>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Alpine Scripts" icon="mountain" href="/reference/containers/alpine-based">
+    Lightweight Alpine-based alternatives
+  </Card>
+  <Card title="Container Overview" icon="layer-group" href="/reference/containers/overview">
+    Back to container scripts overview
+  </Card>
+</CardGroup>

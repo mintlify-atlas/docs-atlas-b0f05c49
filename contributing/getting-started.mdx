@@ -1,0 +1,335 @@
+---
+title: Getting Started with Contributing
+description: Learn how to set up your development environment and make your first contribution to Proxmox VE Helper Scripts
+---
+
+## Welcome Contributors
+
+Thank you for your interest in contributing to Proxmox VE Helper Scripts! This guide will walk you through the setup process and help you make your first contribution.
+
+<Note>
+  All contributors should fork the repository and work in their own fork. Never commit directly to the main repository.
+</Note>
+
+## Quick Start Guide
+
+<Steps>
+  <Step title="Fork the Repository">
+    Visit [community-scripts/ProxmoxVE](https://github.com/community-scripts/ProxmoxVE) on GitHub and click the **Fork** button in the top right corner.
+  </Step>
+
+  <Step title="Clone Your Fork">
+    Clone your forked repository to your local machine:
+    
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/ProxmoxVE.git
+    cd ProxmoxVE
+    ```
+  </Step>
+
+  <Step title="Run Fork Setup Script">
+    This critical step configures all links to point to your fork for testing:
+    
+    ```bash
+    bash docs/contribution/setup-fork.sh --full
+    ```
+    
+    <Warning>
+      This script modifies 600+ files to update curl URLs. You'll need to use cherry-pick when submitting PRs (covered in the guidelines).
+    </Warning>
+    
+    The script automatically:
+    - Detects your GitHub username from git config
+    - Updates all hardcoded links to point to your fork
+    - Creates `.git-setup-info` with your configuration
+    - Backs up modified files with `.backup` extension
+  </Step>
+
+  <Step title="Add Upstream Remote">
+    Configure the upstream repository to sync with the main project:
+    
+    ```bash
+    git remote add upstream https://github.com/community-scripts/ProxmoxVE.git
+    git remote -v  # Verify both origin (your fork) and upstream are configured
+    ```
+  </Step>
+
+  <Step title="Create a Feature Branch">
+    Always work in a feature branch, never directly in main:
+    
+    ```bash
+    git checkout -b feature/my-awesome-app
+    ```
+  </Step>
+</Steps>
+
+## Understanding the Repository Structure
+
+The repository is organized into several key directories:
+
+<CardGroup cols={2}>
+  <Card title="ct/" icon="box">
+    Container creation scripts that run on the Proxmox host. These scripts set up the container and call installation scripts.
+  </Card>
+  
+  <Card title="install/" icon="download">
+    Installation scripts that run inside containers. These perform the actual application installation.
+  </Card>
+  
+  <Card title="frontend/public/json/" icon="file-code">
+    JSON metadata files for the website. Each application needs a corresponding JSON file.
+  </Card>
+  
+  <Card title="misc/" icon="toolbox">
+    Shared function libraries used across all scripts, including `build.func`, `tools.func`, and `install.func`.
+  </Card>
+</CardGroup>
+
+## Development Tools Setup
+
+### Required Tools
+
+1. **Git** - Version control (already installed on most systems)
+2. **A text editor** - VS Code recommended
+3. **Access to a Proxmox VE instance** - For testing your scripts
+
+### Recommended VS Code Extensions
+
+If using Visual Studio Code, install these extensions:
+
+- [Shell Syntax](https://marketplace.visualstudio.com/items?itemName=bmalehorn.shell-syntax) - Enhanced bash syntax highlighting
+- [ShellCheck](https://marketplace.visualstudio.com/items?itemName=timonwong.shellcheck) - Linting for shell scripts
+- [Shell Format](https://marketplace.visualstudio.com/items?itemName=foxundermoon.shell-format) - Auto-formatting for shell scripts
+
+## Creating Your First Contribution
+
+### Choose Your Contribution Type
+
+<Tabs>
+  <Tab title="New Container Script">
+    Adding a new application to the project:
+    
+    ```bash
+    # Copy templates
+    cp docs/contribution/templates_ct/AppName.sh ct/myapp.sh
+    cp docs/contribution/templates_install/AppName-install.sh install/myapp-install.sh
+    cp docs/contribution/templates_json/AppName.json frontend/public/json/myapp.json
+    
+    # Edit the files according to your application
+    ```
+    
+    <Tip>
+      Study existing scripts in the same category as your application before starting. They provide excellent real-world examples.
+    </Tip>
+  </Tab>
+  
+  <Tab title="Update Existing Script">
+    Improving or fixing an existing application:
+    
+    ```bash
+    # Edit the relevant files
+    nano ct/existing-app.sh
+    nano install/existing-app-install.sh
+    
+    # Test thoroughly before submitting
+    ```
+  </Tab>
+  
+  <Tab title="Documentation">
+    Improving documentation or guides:
+    
+    ```bash
+    # Edit markdown files in docs/
+    nano docs/contribution/README.md
+    ```
+  </Tab>
+</Tabs>
+
+## Testing Your Changes
+
+<Warning>
+  **CRITICAL**: You MUST test via curl from GitHub, not by running local files with `bash ct/myapp.sh`.
+</Warning>
+
+### Why Test Via Curl?
+
+The scripts download dependencies and other files from GitHub during execution. Testing locally bypasses these downloads, meaning you won't catch broken URLs.
+
+### Proper Testing Workflow
+
+<Steps>
+  <Step title="Push to Your Fork">
+    ```bash
+    git add ct/myapp.sh install/myapp-install.sh frontend/public/json/myapp.json
+    git commit -m "feat: add MyApp container script"
+    git push origin feature/my-awesome-app
+    ```
+  </Step>
+
+  <Step title="Wait for GitHub">
+    <Note>
+      GitHub takes 10-30 seconds to update files after pushing. Be patient!
+    </Note>
+  </Step>
+
+  <Step title="Test Via Curl">
+    On your Proxmox host, run:
+    
+    ```bash
+    bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/ProxmoxVE/main/ct/myapp.sh)"
+    ```
+    
+    This downloads and executes the script from GitHub, testing the real URLs that users will access.
+  </Step>
+
+  <Step title="Verify Installation">
+    - Check that the container was created successfully
+    - Verify the application is accessible at the displayed URL
+    - Test any update functionality
+    - Confirm no errors in the installation process
+  </Step>
+</Steps>
+
+### Testing with Developer Mode
+
+For debugging, use developer mode flags:
+
+```bash
+# Enable trace output for maximum verbosity
+dev_mode="trace" bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/ProxmoxVE/main/ct/myapp.sh)"
+
+# Keep container even if build fails (for debugging)
+dev_mode="keep" bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/ProxmoxVE/main/ct/myapp.sh)"
+
+# Combine multiple flags
+dev_mode="trace,keep,logs" bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/ProxmoxVE/main/ct/myapp.sh)"
+```
+
+Available flags:
+- `trace` - Enables `set -x` for detailed execution logs
+- `keep` - Prevents container deletion on failure
+- `pause` - Pauses at key points for inspection
+- `logs` - Saves detailed logs to `/var/log/community-scripts/`
+
+## Example Contribution Workflow
+
+Here's a complete example of adding a new application:
+
+```bash
+# 1. Create feature branch
+git checkout -b feature/add-example-app
+
+# 2. Copy templates
+cp docs/contribution/templates_ct/AppName.sh ct/example.sh
+cp docs/contribution/templates_install/AppName-install.sh install/example-install.sh
+cp docs/contribution/templates_json/AppName.json frontend/public/json/example.json
+
+# 3. Edit files (update APP name, dependencies, installation steps, etc.)
+nano ct/example.sh
+nano install/example-install.sh
+nano frontend/public/json/example.json
+
+# 4. Commit your changes
+git add ct/example.sh install/example-install.sh frontend/public/json/example.json
+git commit -m "feat: add Example App container and install scripts"
+
+# 5. Push to your fork
+git push origin feature/add-example-app
+
+# 6. Wait 10-30 seconds, then test
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/ProxmoxVE/main/ct/example.sh)"
+
+# 7. Verify everything works, then prepare PR (see guidelines)
+```
+
+## Keeping Your Fork Updated
+
+Regularly sync your fork with the upstream repository:
+
+```bash
+# Fetch latest changes from upstream
+git fetch upstream
+
+# Switch to your main branch
+git checkout main
+
+# Rebase on upstream main
+git rebase upstream/main
+
+# Force push to your fork (if needed)
+git push -f origin main
+```
+
+## Common Setup Issues
+
+<AccordionGroup>
+  <Accordion title="'Repository not found' when cloning">
+    Make sure you've forked the repository first. Visit the main repository and click the Fork button before trying to clone.
+  </Accordion>
+
+  <Accordion title="'Permission denied' when pushing">
+    Set up SSH keys or use a personal access token:
+    
+    ```bash
+    # Generate SSH key
+    ssh-keygen -t ed25519 -C "your_email@example.com"
+    cat ~/.ssh/id_ed25519.pub  # Add this to GitHub Settings → SSH Keys
+    
+    # Or use HTTPS with token
+    git remote set-url origin https://YOUR_TOKEN@github.com/YOUR_USERNAME/ProxmoxVE.git
+    ```
+  </Accordion>
+
+  <Accordion title="setup-fork.sh fails or doesn't detect username">
+    Manually configure git if auto-detection fails:
+    
+    ```bash
+    git config user.name "Your Name"
+    git config user.email "your.email@example.com"
+    
+    # Then run setup-fork.sh again
+    bash docs/contribution/setup-fork.sh --full
+    ```
+  </Accordion>
+
+  <Accordion title="Can't test - no Proxmox instance available">
+    Consider these options:
+    - Install Proxmox in a VM (VirtualBox, KVM, VMware)
+    - Use a cloud provider with Proxmox support (Hetzner, OVH)
+    - Run syntax checks locally: `bash -n ct/myapp.sh` and `shellcheck ct/myapp.sh`
+    - Ask maintainers to test for you (mention in PR)
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that your environment is set up:
+
+1. Read the [Contribution Guidelines](/contributing/guidelines) to understand coding standards
+2. Review the [Code of Conduct](/contributing/code-of-conduct) for community expectations
+3. Study existing scripts similar to what you want to create
+4. Start building your contribution!
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/community-scripts/ProxmoxVE/discussions">
+    Ask questions and discuss ideas with the community
+  </Card>
+  
+  <Card title="GitHub Issues" icon="circle-exclamation" href="https://github.com/community-scripts/ProxmoxVE/issues">
+    Report bugs or request features
+  </Card>
+  
+  <Card title="Discord Server" icon="discord" href="https://discord.gg/UHrpNWGwkH">
+    Join for real-time chat and support
+  </Card>
+  
+  <Card title="Documentation" icon="book">
+    Comprehensive guides in the `docs/` directory
+  </Card>
+</CardGroup>
+
+<Tip>
+  First-time contributors: Don't hesitate to ask questions! The community is friendly and happy to help.
+</Tip>

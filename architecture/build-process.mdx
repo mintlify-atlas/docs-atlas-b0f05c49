@@ -1,0 +1,503 @@
+---
+title: Build Process
+description: How scripts are executed from start to finish, including the build workflow and container lifecycle
+---
+
+## Overview
+
+The build process for Proxmox VE Helper Scripts follows a well-defined workflow from script invocation to container creation, installation, and final configuration.
+
+## Script Execution Model
+
+### Remote Execution Pattern
+
+All scripts are designed to be executed remotely via curl/wget:
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/pihole.sh)"
+```
+
+This pattern provides several benefits:
+
+<Accordion title="Advantages of Remote Execution">
+- **Always Latest**: Users always get the most recent version
+- **No Manual Updates**: No need to download or update scripts locally
+- **Consistency**: Same execution environment for all users
+- **Easy Distribution**: Single URL for installation
+- **Version Control**: Easy to roll back or test different branches
+</Accordion>
+
+### Dynamic Library Loading
+
+Function libraries are loaded dynamically at runtime:
+
+```bash build.func:86-98
+source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/api.func)
+
+if command -v curl >/dev/null 2>&1; then
+  source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/core.func)
+  source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/error_handler.func)
+  load_functions
+  catch_errors
+elif command -v wget >/dev/null 2>&1; then
+  source <(wget -qO- https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/core.func)
+  source <(wget -qO- https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/error_handler.func)
+  load_functions
+  catch_errors
+fi
+```
+
+## Build Workflow
+
+### Phase 1: Initialization
+
+```
+┌─────────────────────────────────────┐
+│  User Executes CT Creation Script  │
+│  (ct/pihole.sh)                     │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Source build.func                  │
+│  - Load api.func                    │
+│  - Load core.func                   │
+│  - Load error_handler.func          │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Call variables()                   │
+│  - Set NSAPP (normalized app name)  │
+│  - Generate SESSION_ID              │
+│  - Generate EXECUTION_ID            │
+│  - Setup BUILD_LOG path             │
+│  - Detect Proxmox version           │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Call catch_errors()                │
+│  - Setup ERR trap                   │
+│  - Setup EXIT trap                  │
+│  - Setup signal traps (INT/TERM/HUP)│
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Pre-flight Checks                  │
+│  - root_check()                     │
+│  - pve_check()                      │
+│  - arch_check()                     │
+│  - maxkeys_check()                  │
+└──────────────┬──────────────────────┘
+               │
+               v
+         [Continue to Phase 2]
+```
+
+### Phase 2: Configuration
+
+```
+┌─────────────────────────────────────┐
+│  Display Installation Menu          │
+│  1. Default Settings               │
+│  2. Advanced Settings              │
+│  3. User Defaults                  │
+│  4. Edit User Defaults             │
+│  5. Edit App Defaults              │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  User Selects Option                │
+└──────────────┬──────────────────────┘
+               │
+      ┌────────┴────────┐
+      │                 │
+      v                 v
+ [Default]        [Advanced]
+      │                 │
+      v                 v
+┌──────────┐    ┌──────────────────┐
+│ Apply    │    │ Show Interactive │
+│ base_    │    │ Configuration    │
+│ settings │    │ Wizard (19 steps)│
+└────┬─────┘    └────┬─────────────┘
+     │               │
+     v               v
+     │          ┌────────────────┐
+     │          │ Collect User   │
+     │          │ Preferences:   │
+     │          │ - Container ID │
+     │          │ - Hostname     │
+     │          │ - CPU cores    │
+     │          │ - RAM size     │
+     │          │ - Disk size    │
+     │          │ - Network      │
+     │          │ - Storage      │
+     │          │ - etc.         │
+     │          └────┬───────────┘
+     │               │
+     └───────┬───────┘
+             │
+             v
+    [Continue to Phase 3]
+```
+
+### Phase 3: Container Creation
+
+```
+┌─────────────────────────────────────┐
+│  Call build_container()             │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Validate Configuration             │
+│  - Check container ID availability  │
+│  - Verify storage exists            │
+│  - Validate template availability   │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Send Telemetry (if enabled)        │
+│  post_to_api("installing")          │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Execute pct create                 │
+│  - CTID                             │
+│  - Template                         │
+│  - Hostname                         │
+│  - CPU/RAM/Disk                     │
+│  - Network configuration            │
+│  - Features (nesting, fuse, etc.)   │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Wait for Container to Start        │
+│  - pct start CTID                   │
+│  - Wait for running state           │
+│  - Wait for IP assignment           │
+└──────────────┬──────────────────────┘
+               │
+               v
+    [Continue to Phase 4]
+```
+
+### Phase 4: Installation
+
+```
+┌─────────────────────────────────────┐
+│  Download Install Script            │
+│  (install/pihole-install.sh)        │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Push Script to Container           │
+│  pct push CTID install.sh /root/    │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Execute via pct exec               │
+│  pct exec CTID -- bash /root/install│
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Inside Container:                  │
+│  - Source install.func              │
+│  - Source tools.func                │
+│  - Call setting_up_container()      │
+│  - Call network_check()             │
+│  - Call update_os()                 │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Application-Specific Installation  │
+│  - Install dependencies             │
+│  - Download application             │
+│  - Configure application            │
+│  - Start services                   │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Finalization                       │
+│  - Call motd_ssh()                  │
+│  - Call customize()                 │
+│  - Call cleanup_lxc()               │
+└──────────────┬──────────────────────┘
+               │
+               v
+    [Continue to Phase 5]
+```
+
+### Phase 5: Completion
+
+```
+┌─────────────────────────────────────┐
+│  Installation Success               │
+│  - Log completion                   │
+│  - Update MOTD with IP              │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Send Final Telemetry               │
+│  post_update_to_api("done", 0)      │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Offer to Save App Defaults         │
+│  maybe_offer_save_app_defaults()    │
+└──────────────┬──────────────────────┘
+               │
+               v
+┌─────────────────────────────────────┐
+│  Display Completion Message         │
+│  - Container ID                     │
+│  - IP Address                       │
+│  - Access URL (if applicable)       │
+│  - Credentials (if applicable)      │
+└──────────────┬──────────────────────┘
+               │
+               v
+             [Done]
+```
+
+## Key Build Functions
+
+### `variables()`
+
+Initializes core variables at the start of script execution.
+
+```bash build.func:40-84
+variables() {
+  NSAPP=$(echo "${APP,,}" | tr -d ' ')              # Normalize app name
+  var_install="${NSAPP}-install"                    # Install script name
+  INTEGER='^[0-9]+([.][0-9]+)?$'                    # Validation pattern
+  PVEHOST_NAME=$(hostname)                          # Proxmox hostname
+  DIAGNOSTICS="no"                                  # Default: no telemetry
+  METHOD="default"                                  # Default installation method
+  RANDOM_UUID="$(cat /proc/sys/kernel/random/uuid)" # Generate UUID
+  EXECUTION_ID="${RANDOM_UUID}"                     # Unique execution ID
+  SESSION_ID="${RANDOM_UUID:0:8}"                   # Short session ID
+  BUILD_LOG="/tmp/create-lxc-${SESSION_ID}.log"     # Build log path
+  
+  # Parse dev_mode early
+  parse_dev_mode
+  
+  # Setup persistent log directory if logs mode active
+  if [[ "${DEV_MODE_LOGS:-false}" == "true" ]]; then
+    mkdir -p /var/log/community-scripts
+    BUILD_LOG="/var/log/community-scripts/create-lxc-${SESSION_ID}-$(date +%Y%m%d_%H%M%S).log"
+  fi
+  
+  # Get Proxmox VE version
+  if command -v pveversion >/dev/null 2>&1; then
+    PVEVERSION="$(pveversion | awk -F'/' '{print $2}' | awk -F'-' '{print $1}')"
+  else
+    PVEVERSION="N/A"
+  fi
+  KERNEL_VERSION=$(uname -r)
+  
+  # Capture app-declared defaults
+  if [[ -n "${var_cpu:-}" && "${var_cpu}" =~ ^[0-9]+$ ]]; then
+    export APP_DEFAULT_CPU="${var_cpu}"
+  fi
+  if [[ -n "${var_ram:-}" && "${var_ram}" =~ ^[0-9]+$ ]]; then
+    export APP_DEFAULT_RAM="${var_ram}"
+  fi
+  if [[ -n "${var_disk:-}" && "${var_disk}" =~ ^[0-9]+$ ]]; then
+    export APP_DEFAULT_DISK="${var_disk}"
+  fi
+}
+```
+
+### `build_container()`
+
+Creates the LXC container using `pct create` with all configured options.
+
+<Accordion title="Container Creation Parameters">
+- **CTID**: Container ID (100-999999)
+- **Template**: OS template (debian-12, ubuntu-24.04, alpine-3.19, etc.)
+- **Hostname**: Container hostname
+- **Cores**: CPU cores allocated
+- **Memory**: RAM in MB
+- **Swap**: Swap space in MB
+- **Disk**: Root filesystem size in GB
+- **Storage**: Storage location for container
+- **Network**: Network configuration (bridge, IP, gateway, VLAN, MTU)
+- **Features**: nesting, fuse, keyctl, mount options
+- **Unprivileged**: Privileged (0) or unprivileged (1)
+- **Password**: Root password (optional)
+- **SSH Keys**: Public key installation (optional)
+- **Start on Boot**: Auto-start configuration
+- **Protection**: Delete protection
+- **Tags**: Metadata tags
+</Accordion>
+
+### `install_script()`
+
+Main entry point that displays the installation menu and routes to the appropriate workflow.
+
+<CodeGroup>
+```bash Default Settings
+# Uses built-in defaults + user defaults (if exist)
+build.func > base_settings() > build_container()
+```
+
+```bash Advanced Settings
+# Interactive 19-step wizard
+build.func > advanced_settings() > build_container()
+```
+
+```bash User Defaults
+# Load from /usr/local/community-scripts/default.vars
+build.func > default_var_settings() > build_container()
+```
+
+```bash Edit Defaults
+# Interactive editor for default.vars
+build.func > edit_user_defaults() > nano default.vars
+```
+</CodeGroup>
+
+## Container Lifecycle
+
+### State Transitions
+
+```
+┌─────────┐
+│ Created │  (pct create)
+└────┬────┘
+     │
+     v
+┌─────────┐
+│ Stopped │  (initial state)
+└────┬────┘
+     │
+     v (pct start)
+┌─────────┐
+│ Running │  (waiting for network)
+└────┬────┘
+     │
+     v (IP assigned)
+┌──────────┐
+│ Ready    │  (execute install script)
+└────┬─────┘
+     │
+     v (pct exec)
+┌──────────────┐
+│ Installing   │  (running install.sh)
+└────┬─────────┘
+     │
+     v (installation complete)
+┌──────────────┐
+│ Configured   │  (final state)
+└──────────────┘
+```
+
+### IP Assignment
+
+The build process waits for the container to obtain an IP address:
+
+```bash build.func
+# Wait for container to get an IP (retry up to 30 times)
+for ((i = RETRY_NUM; i > 0; i--)); do
+  if [ "$(pct exec $CTID -- hostname -I)" != "" ]; then
+    IP=$(pct exec $CTID -- hostname -I | awk '{print $1}')
+    break
+  fi
+  sleep $RETRY_EVERY
+done
+
+if [ -z "$IP" ]; then
+  msg_error "No IP assigned to container after timeout"
+  exit 118
+fi
+```
+
+## Logging
+
+### Log Files
+
+The build process generates multiple log files:
+
+| Log File | Location | Content |
+|----------|----------|----------|
+| BUILD_LOG | `/tmp/create-lxc-{SESSION_ID}.log` | Host-side container creation |
+| INSTALL_LOG | `/root/.install-{SESSION_ID}.log` | Container-side installation |
+| Combined Log | `/tmp/{NSAPP}-{CTID}-{SESSION_ID}.log` | Merged build + install logs |
+| Debug Log | `/var/log/community-scripts/` | Dev mode logs (persistent) |
+
+### Log Levels
+
+<Accordion title="Verbose Mode (VERBOSE=yes)">
+- Full command output displayed
+- All package installation output shown
+- Detailed progress messages
+- Useful for debugging installation issues
+</Accordion>
+
+<Accordion title="Silent Mode (VERBOSE=no, default)">
+- Output suppressed using `silent()` wrapper
+- Only status messages displayed
+- Spinner shown for long operations
+- Cleaner user experience
+</Accordion>
+
+## Error Handling During Build
+
+### Build Errors
+
+If an error occurs during the build process:
+
+1. **ERR trap fires** → `error_handler()` is called
+2. **Telemetry sent** → `post_update_to_api("failed", exit_code)`
+3. **Log displayed** → Last 20 lines shown to user
+4. **Cleanup offered** → User prompted to remove broken container
+5. **Auto-removal** → Container removed after 60s timeout (default: yes)
+
+### Signal Handling
+
+The build process handles interruptions gracefully:
+
+<CodeGroup>
+```bash SIGINT (Ctrl+C)
+# User presses Ctrl+C
+→ on_interrupt() fires
+→ Telemetry sent (exit code 130)
+→ Container stopped if installing
+→ Exit with code 130
+```
+
+```bash SIGTERM (kill)
+# Process killed
+→ on_terminate() fires
+→ Telemetry sent (exit code 143)
+→ Container stopped if installing
+→ Exit with code 143
+```
+
+```bash SIGHUP (SSH disconnect)
+# SSH session closed
+→ on_hangup() fires
+→ Telemetry sent (exit code 129)
+→ Container stopped to prevent ghost processes
+→ Exit with code 129
+```
+</CodeGroup>
+
+<Note>
+  The build process is designed to be resilient to interruptions. All signal handlers ensure proper cleanup and telemetry reporting to prevent orphaned containers and stuck status records.
+</Note>

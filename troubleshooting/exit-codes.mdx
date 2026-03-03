@@ -1,0 +1,533 @@
+---
+title: Exit Codes Reference
+description: Comprehensive documentation of all exit codes used in Proxmox VE Helper Scripts
+---
+
+## Understanding Exit Codes
+
+Exit codes provide detailed information about why a script failed. Each code maps to a specific error condition, making troubleshooting faster and more precise.
+
+<Note>
+  Exit code 0 always indicates success. Non-zero codes indicate various types of failures.
+</Note>
+
+## Quick Reference Chart
+
+| Exit Code Range | Category           | Typical Issue                               |
+| --------------- | ------------------ | ------------------------------------------- |
+| 1-2, 126-143    | Shell/System       | Permissions, signals, missing commands      |
+| 100-102         | Package Manager    | APT/DPKG errors, broken packages            |
+| 103-125         | Script Validation  | Environment checks, prerequisites           |
+| 160-162         | Python/pip         | Virtual environments, dependencies          |
+| 170-193         | Databases          | Connection, authentication, query errors    |
+| 200-209         | Container Creation | CTID, password, configuration               |
+| 210-217         | Storage/Cluster    | Disk space, quorum, storage type            |
+| 218-225         | Templates          | Download, corruption, availability          |
+| 231-238         | Tools/Addons       | Tool-specific errors                        |
+| 243-249         | Node.js/npm        | Runtime errors, memory issues               |
+| 250-254         | Application        | Download, extraction, migration             |
+
+## Generic Shell Errors (1-2, 126-143)
+
+Standard Unix/Linux exit codes used across all scripts.
+
+<CodeGroup>
+```bash Basic Errors
+# Exit Code 1 - General error / Operation not permitted
+# Cause: Permission denied, general failure
+# Solution: Check user permissions, run as root if needed
+
+# Exit Code 2 - Misuse of shell builtins
+# Cause: Syntax error in script
+# Solution: Review script syntax, check bash version
+```
+
+```bash Permission Errors
+# Exit Code 126 - Command cannot execute
+# Cause: Permission problem, not executable
+# Solution: chmod +x script.sh or check file permissions
+
+# Exit Code 127 - Command not found
+# Cause: Missing binary, wrong PATH
+# Solution: Install required package, check PATH variable
+```
+
+```bash Signal-Related Exits
+# Exit Code 130 - Terminated by Ctrl+C (SIGINT)
+# Cause: User interrupted script
+# Solution: Expected behavior, no action needed
+
+# Exit Code 137 - Killed (SIGKILL)
+# Cause: Out of memory, forced termination
+# Solution: Check memory usage, increase RAM allocation
+
+# Exit Code 143 - Terminated (SIGTERM)
+# Cause: Graceful shutdown signal
+# Solution: Expected during container stops
+```
+</CodeGroup>
+
+<Accordion title="Complete Shell Error Reference">
+  | Code | Description | Common Causes | Solutions |
+  |------|-------------|---------------|----------|
+  | 1 | General error / Operation not permitted | Permission denied, general failure | Check user permissions, run as root if needed |
+  | 2 | Misuse of shell builtins | Syntax error in script | Review script syntax, check bash version |
+  | 126 | Command cannot execute | Permission problem, not executable | `chmod +x script.sh` or check file permissions |
+  | 127 | Command not found | Missing binary, wrong PATH | Install required package, check PATH variable |
+  | 128 | Invalid argument to exit | Invalid exit code passed | Use exit codes 0-255 only |
+  | 130 | Terminated by Ctrl+C (SIGINT) | User interrupted script | Expected behavior, no action needed |
+  | 137 | Killed (SIGKILL) | Out of memory, forced termination | Check memory usage, increase RAM allocation |
+  | 139 | Segmentation fault | Memory access violation, corrupted binary | Reinstall package, check system stability |
+  | 143 | Terminated (SIGTERM) | Graceful shutdown signal | Expected during container stops |
+</Accordion>
+
+## Package Manager Errors (100-102, 255)
+
+APT, DPKG, and package installation errors.
+
+<AccordionGroup>
+  <Accordion title="Exit Code 100 - APT Package Manager Error">
+    **Common Causes:**
+    - Broken packages
+    - Dependency conflicts
+    - Failed installations
+
+    **Solutions:**
+    ```bash
+    # Fix broken packages
+    apt --fix-broken install
+    
+    # Reconfigure packages
+    dpkg --configure -a
+    
+    # Update and retry
+    apt update
+    apt upgrade
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 101 - APT Configuration Error">
+    **Common Causes:**
+    - Malformed sources.list
+    - Bad repository configuration
+    - Invalid GPG keys
+
+    **Solutions:**
+    ```bash
+    # Check sources.list
+    cat /etc/apt/sources.list
+    cat /etc/apt/sources.list.d/*.list
+    
+    # Fix and update
+    apt update
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 102 - APT Lock Held">
+    **Common Causes:**
+    - Another apt/dpkg process running
+    - Stale lock files
+
+    **Solutions:**
+    ```bash
+    # Check running processes
+    ps aux | grep -E 'apt|dpkg'
+    
+    # If safe to remove locks:
+    rm /var/lib/dpkg/lock-frontend
+    rm /var/lib/dpkg/lock
+    dpkg --configure -a
+    ```
+
+    <Warning>
+      Only remove lock files if no package manager processes are running.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Exit Code 255 - DPKG Fatal Internal Error">
+    **Common Causes:**
+    - Corrupted package database
+    - System inconsistency
+
+    **Solutions:**
+    ```bash
+    # Reconfigure all packages
+    dpkg --configure -a
+    
+    # If needed, restore from backup
+    # Check /var/backups/dpkg.status.*
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Script Validation Errors (103-125)
+
+Environment checks and prerequisite validation.
+
+<Accordion title="Validation Error Codes">
+  | Code | Description | Solution |
+  |------|-------------|----------|
+  | 103 | Shell is not Bash | Use bash to run the script |
+  | 104 | Not running as root | Run with sudo or as root user |
+  | 105 | Proxmox VE version not supported | Upgrade Proxmox VE |
+  | 106 | Architecture not supported (ARM/PiMox) | Use x86_64 architecture |
+  | 109 | No available container ID after max attempts | Manually specify CTID |
+  | 116 | Default bridge vmbr0 not found | Configure network bridge |
+  | 117 | Container did not reach running state | Check container logs |
+  | 118 | No IP assigned to container | Check DHCP/network config |
+  | 119 | No valid storage for rootdir | Configure compatible storage |
+  | 122 | No internet connectivity | Check network and routing |
+</Accordion>
+
+## Container Creation Errors (200-209)
+
+Errors during LXC container creation.
+
+<AccordionGroup>
+  <Accordion title="Exit Code 205 - Invalid CTID (<100)">
+    **Problem:** Container ID is below the minimum allowed value.
+
+    **Solution:**
+    Use CTID ≥ 100. Container IDs 1-99 are reserved for Proxmox system use.
+  </Accordion>
+
+  <Accordion title="Exit Code 206 - CTID Already in Use">
+    **Problem:** A container or VM with this ID already exists.
+
+    **Solutions:**
+    ```bash
+    # Check existing containers
+    pct list
+    
+    # Check for ghost containers
+    ls /etc/pve/lxc/
+    
+    # Use a different CTID
+    ```
+
+    <Note>
+      If a container appears in `/etc/pve/lxc/` but not in `pct list`, manually remove the config file.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Exit Code 207 - Password Contains Special Characters">
+    **Problem:** Password validation failed due to unescaped special characters.
+
+    **Problematic Characters:**
+    Special characters at start/end: `-`, `/`, `\`, `*`, `!`, `@`
+
+    **Solution:**
+    Use alphanumeric passwords or avoid leading/trailing special characters.
+  </Accordion>
+
+  <Accordion title="Exit Code 208 - Invalid Configuration">
+    **Common Issues:**
+    - DNS format: `.home` instead of `home` (remove leading dot)
+    - MAC format: `AA-BB-CC` instead of `AA:BB:CC` (use colons)
+    - Invalid IP address format
+
+    **Solution:**
+    Verify all configuration parameters follow correct format.
+  </Accordion>
+
+  <Accordion title="Exit Code 209 - Container Creation Failed">
+    **Problem:** General container creation failure.
+
+    **Solutions:**
+    ```bash
+    # Check detailed logs
+    tail -n 50 /tmp/pct_create_*.log
+    
+    # Verify template
+    pveam list local
+    
+    # Check storage
+    pvesm status
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Storage & Cluster Errors (210-217)
+
+<AccordionGroup>
+  <Accordion title="Exit Code 210 - Cluster Not Quorate">
+    **Problem:** Cluster doesn't have enough nodes online.
+
+    **Solutions:**
+    ```bash
+    # Check cluster status
+    pvecm status
+    
+    # For single-node testing (temporary)
+    pvecm expected 1
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 214 - Not Enough Storage Space">
+    **Solutions:**
+    ```bash
+    # Check storage
+    pvesm status
+    df -h
+    
+    # Free up space
+    # - Remove old backups
+    # - Remove unused templates
+    # - Clean logs
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 217 - Storage Does Not Support Rootdir">
+    **Problem:** Selected storage type doesn't support LXC containers.
+
+    **Incompatible Storage:**
+    - `iscsidirect` (VMs only)
+    - `cephfs` (use RBD instead)
+    - `pbs` (backups only)
+
+    **Compatible Storage:**
+    - `dir`, `zfspool`, `lvm-thin`, `rbd`
+  </Accordion>
+</AccordionGroup>
+
+## Template Errors (218-225)
+
+<AccordionGroup>
+  <Accordion title="Exit Code 218 - Template Corrupted or Incomplete">
+    **Common Causes:**
+    - Download interrupted
+    - File size < 1MB
+    - Invalid archive format
+
+    **Solutions:**
+    ```bash
+    # Remove corrupted template
+    rm /var/lib/vz/template/cache/<template>
+    
+    # Re-download
+    pveam update
+    pveam download local <template>
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 222 - Template Download Failed">
+    **Problem:** Template download failed after 3 attempts.
+
+    **Solutions:**
+    ```bash
+    # Check connectivity
+    ping download.proxmox.com
+    
+    # Verify storage
+    pvesm status
+    df -h
+    
+    # Update and retry
+    pveam update
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 225 - No Template Available">
+    **Problem:** Template not available for specified OS/version.
+
+    **Solutions:**
+    ```bash
+    # Update template list
+    pveam update
+    
+    # Check available templates
+    pveam available --section system
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Database Errors
+
+<CodeGroup>
+```bash PostgreSQL (170-173)
+# Exit Code 170 - Connection failed
+systemctl status postgresql
+systemctl start postgresql
+
+# Exit Code 171 - Authentication failed
+# Check pg_hba.conf and credentials
+
+# Exit Code 172 - Database does not exist
+CREATE DATABASE dbname;
+
+# Exit Code 173 - Fatal error in query
+# Review SQL syntax and constraints
+```
+
+```bash MySQL/MariaDB (180-183)
+# Exit Code 180 - Connection failed
+systemctl status mysql
+systemctl start mysql
+
+# Exit Code 181 - Authentication failed
+# Verify username/password and grants
+
+# Exit Code 182 - Database does not exist
+CREATE DATABASE dbname;
+
+# Exit Code 183 - Fatal error in query
+# Review SQL syntax
+```
+
+```bash MongoDB (190-193)
+# Exit Code 190 - Connection failed
+systemctl status mongod
+systemctl start mongod
+
+# Exit Code 191 - Authentication failed
+# Create user with proper permissions
+
+# Exit Code 192 - Database not found
+# Database auto-created on first write
+
+# Exit Code 193 - Fatal query error
+# Review MongoDB query syntax
+```
+</CodeGroup>
+
+## Node.js/npm Errors (243-249)
+
+<AccordionGroup>
+  <Accordion title="Exit Code 243 - Out of Memory">
+    **Problem:** JavaScript heap exhausted.
+
+    **Solutions:**
+    ```bash
+    # Increase memory limit
+    export NODE_OPTIONS="--max-old-space-size=4096"
+    
+    # Allocate more RAM to container
+    pct set <CTID> -memory 4096
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 247 - Fatal Internal Error">
+    **Solutions:**
+    ```bash
+    # Update Node.js
+    # Check for known bugs in Node.js version
+    # Review application logs
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 249 - npm/pnpm/yarn Fatal Error">
+    **Solutions:**
+    ```bash
+    # Clear cache
+    npm cache clean --force
+    
+    # Reinstall package manager
+    npm install -g npm@latest
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Python/pip Errors (160-162)
+
+<AccordionGroup>
+  <Accordion title="Exit Code 160 - Virtualenv Missing or Broken">
+    **Solutions:**
+    ```bash
+    # Recreate virtualenv
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+  </Accordion>
+
+  <Accordion title="Exit Code 162 - Installation Aborted">
+    **Problem:** EXTERNALLY-MANAGED or permission denied.
+
+    **Solutions:**
+    ```bash
+    # Use virtual environment (recommended)
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install <package>
+    
+    # Or use --break-system-packages (with caution)
+    pip install --break-system-packages <package>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Application Errors (250-254)
+
+| Code | Description | Common Solution |
+|------|-------------|----------------|
+| 250 | Download failed or version not determined | Check network, verify URL |
+| 251 | File extraction failed | Verify archive integrity |
+| 252 | Required file or resource not found | Check installation path |
+| 253 | Data migration required | Follow migration guide |
+| 254 | User declined prompt or timeout | Review and accept prompts |
+
+## Troubleshooting Tips
+
+### Finding Error Details
+
+<CodeGroup>
+```bash Check Logs
+# View creation logs
+tail -n 50 /tmp/pct_create_*.log
+
+# View installation logs
+tail -n 50 /tmp/install-*.log
+
+# View persistent logs (if debug mode enabled)
+tail -f /var/log/community-scripts/*.log
+```
+
+```bash Enable Verbose Mode
+# Run with bash tracing
+bash -x script.sh
+
+# Or use debug mode
+export dev_mode="trace,logs"
+bash -c "$(curl ...)"
+```
+
+```bash Check Container Status
+# List containers
+pct list
+
+# Check specific container
+pct status <CTID>
+pct config <CTID>
+
+# Enter container
+pct enter <CTID>
+```
+
+```bash Verify Storage
+# Check storage status
+pvesm status
+
+# Check disk usage
+df -h
+
+# List templates
+pveam list local
+```
+</CodeGroup>
+
+## Common Patterns
+
+<Note>
+  **Exit 0 with error message:** Configuration validation failed (check DNS, MAC, password format)
+
+  **Exit 206 but container not visible:** Ghost container state - check `/etc/pve/lxc/` manually
+
+  **Exit 209 generic error:** Check `/tmp/pct_create_*.log` for specific `pct create` failure reason
+
+  **Exit 218 or 222:** Template issues - delete and re-download template
+</Note>
+
+## See Also
+
+- [Common Issues](/troubleshooting/common-issues) - Detailed solutions for frequent problems
+- [Debug Mode](/troubleshooting/debug-mode) - Enable verbose logging and tracing
+- [Logs](/troubleshooting/logs) - Log file locations and analysis

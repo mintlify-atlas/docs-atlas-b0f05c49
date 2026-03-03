@@ -1,0 +1,360 @@
+---
+title: Defaults System
+description: Configure and save installation settings for reusable container deployments
+---
+
+The defaults system provides a three-tier configuration hierarchy that allows you to save and reuse installation settings across container deployments. This eliminates repetitive configuration and ensures consistency across your infrastructure.
+
+## Understanding the System
+
+### Three-Tier Configuration Hierarchy
+
+Settings are applied in the following priority order:
+
+<Steps>
+  <Step title="Environment Variables (Highest Priority)">
+    Variables set in your shell environment before running a script
+    ```bash
+    export var_cpu=8
+    export var_ram=4096
+    ```
+  </Step>
+  
+  <Step title="App Defaults">
+    Application-specific saved settings stored in:
+    ```
+    /usr/local/community-scripts/defaults/<appname>.vars
+    ```
+  </Step>
+  
+  <Step title="User Defaults">
+    Your global defaults applied to all containers stored in:
+    ```
+    /usr/local/community-scripts/default.vars
+    ```
+  </Step>
+  
+  <Step title="Built-in Defaults (Lowest Priority)">
+    Hardcoded defaults within each script, providing sensible fallback values
+  </Step>
+</Steps>
+
+## Installation Modes
+
+When you run any installation script, you'll be presented with several options:
+
+### Default Settings
+
+Quick installation using built-in defaults with no configuration prompts.
+
+<Card title="Best For" icon="zap">
+  First-time users and quick deployments where default settings are acceptable
+</Card>
+
+### Advanced Settings
+
+Full customization with 19 configuration steps covering every aspect of the container.
+
+**Available Settings:**
+- CPU cores, RAM amount, disk size
+- Container name and network configuration
+- SSH access, API access, features
+- Password, SSH keys, tags
+- Security options
+
+<Note>
+  After completing advanced setup, you'll be prompted to save these settings as App Defaults for future deployments
+</Note>
+
+### User Defaults
+
+Use your saved global defaults that apply to all container installations.
+
+```bash
+# Run any script and select option 3
+bash pihole-install.sh
+# Select: 3) User Defaults
+```
+
+### App Defaults
+
+Use previously saved application-specific defaults for identical deployments.
+
+<Warning>
+  This option only appears if you've previously saved App Defaults for the specific application
+</Warning>
+
+## Saving Defaults
+
+### During Installation
+
+The easiest way to create defaults:
+
+<CodeGroup>
+```bash App Defaults
+# Run installation with Advanced Settings
+bash pihole-install.sh
+
+# Select: 2) Advanced Settings
+# Configure all options
+# At the end, when prompted:
+# "Save as App Defaults for PiHole?" → Yes
+
+# Settings saved to:
+# /usr/local/community-scripts/defaults/pihole.vars
+```
+
+```bash User Defaults
+# Run any installation with Advanced Settings
+bash debian-install.sh
+
+# Select: 2) Advanced Settings
+# Configure your preferred global settings
+# When prompted:
+# "Save as User Defaults?" → Yes
+
+# Settings saved to:
+# /usr/local/community-scripts/default.vars
+```
+</CodeGroup>
+
+### Manual File Creation
+
+For advanced users who want to create defaults without running installation:
+
+<Tabs>
+  <Tab title="User Defaults">
+    ```bash
+    sudo tee /usr/local/community-scripts/default.vars > /dev/null << 'EOF'
+    # Global User Defaults
+    var_cpu=4
+    var_ram=2048
+    var_disk=20
+    var_unprivileged=1
+    var_brg=vmbr0
+    var_gateway=192.168.1.1
+    var_timezone=Europe/Berlin
+    var_ssh=yes
+    var_container_storage=local
+    var_template_storage=local
+    EOF
+    ```
+  </Tab>
+  
+  <Tab title="App Defaults">
+    ```bash
+    sudo tee /usr/local/community-scripts/defaults/pihole.vars > /dev/null << 'EOF'
+    # App-specific defaults for PiHole
+    var_unprivileged=1
+    var_cpu=2
+    var_ram=1024
+    var_disk=10
+    var_brg=vmbr0
+    var_gateway=192.168.1.1
+    var_hostname=pihole
+    var_container_storage=local
+    var_template_storage=local
+    EOF
+    ```
+  </Tab>
+</Tabs>
+
+## Managing Defaults
+
+### View Settings
+
+<CodeGroup>
+```bash User Defaults
+cat /usr/local/community-scripts/default.vars
+```
+
+```bash App Defaults
+cat /usr/local/community-scripts/defaults/pihole.vars
+```
+
+```bash List All Apps
+ls -la /usr/local/community-scripts/defaults/
+```
+</CodeGroup>
+
+### Edit Settings
+
+```bash
+# Edit User Defaults
+sudo nano /usr/local/community-scripts/default.vars
+
+# Edit App Defaults
+sudo nano /usr/local/community-scripts/defaults/pihole.vars
+```
+
+### Update Existing Defaults
+
+Re-run the installation with Advanced Settings:
+
+```bash
+bash pihole-install.sh
+# Select: Advanced Settings
+# Make desired changes
+# When asked to save: "Defaults already exist, Update?" → Yes
+```
+
+### Delete Defaults
+
+<Warning>
+  Deleting defaults cannot be undone. You'll need to recreate them manually or through Advanced Settings.
+</Warning>
+
+```bash
+# Delete User Defaults
+sudo rm /usr/local/community-scripts/default.vars
+
+# Delete specific App Defaults
+sudo rm /usr/local/community-scripts/defaults/pihole.vars
+
+# Delete all App Defaults
+sudo rm /usr/local/community-scripts/defaults/*
+```
+
+## Example Configurations
+
+### High-Performance Gaming Server
+
+```bash
+# /usr/local/community-scripts/defaults/gaming.vars
+var_cpu=8
+var_ram=8192
+var_disk=100
+var_unprivileged=0
+var_fuse=1
+var_nesting=1
+var_tags=gaming;performance
+```
+
+### Development Environment
+
+```bash
+# /usr/local/community-scripts/defaults/development.vars
+var_cpu=4
+var_ram=4096
+var_disk=50
+var_unprivileged=1
+var_nesting=1
+var_ssh=yes
+var_tags=development;docker
+```
+
+### Low-Resource IoT Container
+
+```bash
+# /usr/local/community-scripts/defaults/iot.vars
+var_cpu=1
+var_ram=512
+var_disk=8
+var_unprivileged=1
+var_nesting=0
+var_fuse=0
+var_tun=0
+var_tags=iot;monitoring
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="App Defaults not available">
+    You haven't created App Defaults yet for this application.
+    
+    **Solution:**
+    1. Run the app with "Advanced Settings"
+    2. Configure your preferences
+    3. When finished, save as App Defaults
+    4. Next time, App Defaults will be available
+  </Accordion>
+  
+  <Accordion title="Settings not being applied">
+    Check the following:
+    
+    ```bash
+    # Verify files exist
+    ls -la /usr/local/community-scripts/default.vars
+    ls -la /usr/local/community-scripts/defaults/<app>.vars
+    
+    # Check file permissions
+    stat /usr/local/community-scripts/default.vars
+    
+    # Check for environment variable override
+    env | grep var_
+    # If you have var_* set, those override saved defaults
+    ```
+  </Accordion>
+  
+  <Accordion title="Cannot write to defaults location">
+    Permission denied when saving defaults.
+    
+    **Solution:**
+    ```bash
+    # Create the defaults directory if missing
+    sudo mkdir -p /usr/local/community-scripts/defaults
+    
+    # Fix permissions
+    sudo chmod 755 /usr/local/community-scripts
+    sudo chmod 755 /usr/local/community-scripts/defaults
+    
+    # Make sure you're running as root
+    sudo bash pihole-install.sh
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## File Format
+
+<Info>
+  Defaults files use a simple `key=value` format with specific syntax rules
+</Info>
+
+```bash
+# Comments start with #
+var_name=value
+
+# No spaces around =
+var_cpu=4              # ✓ Correct
+var_cpu = 4            # ✗ Wrong
+
+# String values don't need quotes
+var_hostname=mycontainer           # ✓ Correct
+var_hostname='mycontainer'         # ✓ Also correct
+
+# Values with spaces or special chars need quotes
+var_tags="docker,production,testing"  # ✓ Correct
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Do" icon="check" color="#10b981">
+    - Use App Defaults for app-specific settings
+    - Use User Defaults for global preferences
+    - Edit defaults files directly with nano
+    - Keep separate App Defaults for each app
+    - Back up your defaults regularly
+    - Use environment variables for temporary overrides
+  </Card>
+  
+  <Card title="Don't" icon="xmark" color="#ef4444">
+    - Don't use `source` on defaults files (security risk)
+    - Don't put sensitive passwords in defaults
+    - Don't modify defaults during installation
+    - Don't delete defaults directory while creating containers
+    - Don't use special characters without escaping
+  </Card>
+</CardGroup>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="code" href="/configuration/environment-variables">
+    Complete list of available configuration variables
+  </Card>
+  <Card title="Unattended Deployment" icon="rocket" href="/configuration/unattended-deployment">
+    Automate deployments with defaults and environment variables
+  </Card>
+</CardGroup>

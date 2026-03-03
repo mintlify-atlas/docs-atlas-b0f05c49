@@ -1,0 +1,521 @@
+---
+title: Network Appliance VMs
+description: Deploy OPNsense, OpenWrt, MikroTik RouterOS, and other network solutions in Proxmox VE
+---
+
+Network appliance VMs provide enterprise-grade routing, firewall, and network management capabilities within Proxmox VE.
+
+## Available Network Appliances
+
+<CardGroup cols={3}>
+  <Card title="OPNsense" icon="shield-halved">
+    Advanced firewall and routing platform
+  </Card>
+  <Card title="OpenWrt" icon="router">
+    Powerful wireless router firmware
+  </Card>
+  <Card title="MikroTik RouterOS" icon="server">
+    Professional router operating system
+  </Card>
+</CardGroup>
+
+## OPNsense Firewall
+
+OPNsense is an open-source firewall and routing platform based on FreeBSD, offering enterprise features.
+
+**Script:** `opnsense-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/opnsense-vm.sh)"
+```
+
+<Steps>
+  <Step title="Run the Script">
+    Execute the command from Proxmox VE shell.
+  </Step>
+  
+  <Step title="Configure Network Interfaces">
+    The script creates:
+    - **WAN interface** (first network device)
+    - **LAN interface** (second network device)
+    
+    You'll configure which Proxmox bridge each connects to.
+  </Step>
+  
+  <Step title="Set VM Resources">
+    Configure:
+    - VM ID
+    - Hostname
+    - CPU cores (recommended: 2-4)
+    - RAM (recommended: 2-4 GB)
+    - Disk size (recommended: 16-32 GB)
+  </Step>
+  
+  <Step title="Complete Installation">
+    Access OPNsense console to finish setup.
+  </Step>
+</Steps>
+
+### OPNsense Features
+
+- Stateful firewall
+- VPN (OpenVPN, WireGuard, IPsec)
+- Intrusion Detection/Prevention (IDS/IPS)
+- Traffic shaping
+- Web proxy with caching
+- Load balancing
+- High availability
+- Multi-WAN support
+- Plugin ecosystem
+
+### Initial OPNsense Setup
+
+<Accordion title="Default Credentials">
+**Username:** `root`  
+**Password:** `opnsense`
+
+**Web Interface:**
+- Default LAN IP: `192.168.1.1`
+- URL: `https://192.168.1.1`
+</Accordion>
+
+<CodeGroup>
+
+```bash Console Access
+# Via Proxmox VM console
+# Login with root/opnsense
+
+# Assign interfaces
+1) Assign interfaces
+2) Set interface IP address
+8) Shell
+```
+
+```bash Web Interface First Login
+# Navigate to https://LAN-IP
+# Login: root / opnsense
+# Follow setup wizard:
+# 1. Set hostname and domain
+# 2. Configure time zone
+# 3. Configure WAN interface
+# 4. Configure LAN interface
+# 5. Change admin password
+# 6. Reload configuration
+```
+
+</CodeGroup>
+
+### Network Configuration
+
+<Accordion title="Dual Network Setup">
+OPNsense requires at least two network interfaces:
+
+**WAN (vmbr0)**: Internet-facing interface  
+**LAN (vmbr1)**: Internal network interface
+
+In Proxmox, create a second bridge or use VLANs to separate WAN/LAN traffic.
+</Accordion>
+
+### Recommended OPNsense Resources
+
+| Use Case | CPU | RAM | Disk |
+|----------|-----|-----|------|
+| Home/Small Office | 2 cores | 2 GB | 16 GB |
+| Medium Business | 4 cores | 4 GB | 32 GB |
+| Enterprise | 8+ cores | 8+ GB | 64+ GB |
+
+## OpenWrt Router
+
+OpenWrt is a Linux-based router firmware with extensive package support and customization.
+
+**Script:** `openwrt-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/openwrt-vm.sh)"
+```
+
+<Note>
+OpenWrt VM uses minimal resources (1 GB disk by default) and is perfect for testing or lightweight routing tasks.
+</Note>
+
+### OpenWrt Features
+
+- Package management (opkg)
+- Advanced routing protocols
+- QoS and traffic control
+- VPN support (OpenVPN, WireGuard)
+- Wireless management (with compatible hardware)
+- Extensive customization
+- Active community packages
+
+### Initial OpenWrt Setup
+
+<Steps>
+  <Step title="Access Web Interface">
+    Default LAN IP: `192.168.1.1`
+    
+    Navigate to: `http://192.168.1.1`
+  </Step>
+  
+  <Step title="Set Root Password">
+    **First login has no password**
+    
+    1. Click "Login" (no password needed initially)
+    2. Go to System → Administration
+    3. Set a root password
+    4. Save & Apply
+  </Step>
+  
+  <Step title="Configure Network">
+    1. Network → Interfaces
+    2. Configure WAN interface (typically DHCP or Static)
+    3. Configure LAN interface (default: 192.168.1.1/24)
+    4. Save & Apply
+  </Step>
+  
+  <Step title="Update Packages">
+    ```bash
+    # Via SSH or console
+    opkg update
+    opkg list-upgradable
+    opkg upgrade <package-name>
+    ```
+  </Step>
+</Steps>
+
+### Network Configuration
+
+<Accordion title="Dual Interface Setup">
+Like OPNsense, OpenWrt benefits from separate WAN/LAN interfaces:
+
+- **eth0** → WAN (vmbr0)
+- **eth1** → LAN (vmbr1)
+
+Configure during script execution or add interfaces later in Proxmox.
+</Accordion>
+
+### Common OpenWrt Packages
+
+<CodeGroup>
+
+```bash VPN Packages
+# WireGuard
+opkg update
+opkg install wireguard-tools luci-app-wireguard
+
+# OpenVPN
+opkg install openvpn-openssl luci-app-openvpn
+```
+
+```bash Network Tools
+# Advanced monitoring
+opkg install luci-app-statistics collectd
+
+# Traffic analysis
+opkg install luci-app-nlbwmon
+
+# DNS improvements
+opkg install dnsmasq-full
+```
+
+```bash Additional Services
+# Dynamic DNS
+opkg install luci-app-ddns
+
+# Wake on LAN
+opkg install luci-app-wol
+
+# UPnP
+opkg install luci-app-upnp
+```
+
+</CodeGroup>
+
+## MikroTik RouterOS CHR
+
+MikroTik RouterOS Cloud Hosted Router (CHR) is a professional routing platform.
+
+**Script:** `mikrotik-routeros.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/mikrotik-routeros.sh)"
+```
+
+<Warning>
+MikroTik CHR has licensing tiers based on performance. The free license is limited to 1 Mbps throughput.
+</Warning>
+
+### MikroTik CHR License Levels
+
+| License | Speed Limit | Price |
+|---------|-------------|-------|
+| Free | 1 Mbps | Free |
+| P1 | 1 Gbps | $45 |
+| P10 | 10 Gbps | $95 |
+| P-Unlimited | Unlimited | $250 |
+
+### Initial MikroTik Setup
+
+<Steps>
+  <Step title="Access Via Console">
+    Login credentials:
+    - **Username:** `admin`
+    - **Password:** (blank - press Enter)
+  </Step>
+  
+  <Step title="Access Via Winbox">
+    Download Winbox from MikroTik.com
+    
+    Connect to VM's MAC address (shows in neighbors)
+  </Step>
+  
+  <Step title="Basic Configuration">
+    ```bash
+    # Set identity
+    /system identity set name=RouterOS-VM
+    
+    # Set admin password
+    /user set admin password=newpassword
+    
+    # Configure IP address
+    /ip address add address=192.168.88.1/24 interface=ether1
+    
+    # Enable SSH
+    /ip service enable ssh
+    ```
+  </Step>
+  
+  <Step title="Apply License">
+    If purchased, apply license key:
+    ```bash
+    /system license renew account=your-account password=your-password
+    ```
+  </Step>
+</Steps>
+
+### MikroTik RouterOS Features
+
+- Advanced routing (BGP, OSPF, RIP)
+- MPLS
+- VPN (L2TP, PPTP, OpenVPN, IPsec, WireGuard)
+- Firewall and NAT
+- Quality of Service (QoS)
+- Hotspot management
+- User management
+- Scripting engine
+- Extensive monitoring
+
+### Quick Configuration Example
+
+<CodeGroup>
+
+```bash Basic Router Setup
+# Configure WAN (DHCP client)
+/ip dhcp-client add interface=ether1 disabled=no
+
+# Configure LAN
+/ip address add address=192.168.88.1/24 interface=ether2
+/ip pool add name=dhcp_pool ranges=192.168.88.100-192.168.88.200
+/ip dhcp-server network add address=192.168.88.0/24 gateway=192.168.88.1 dns-server=8.8.8.8
+/ip dhcp-server add name=dhcp1 interface=ether2 address-pool=dhcp_pool disabled=no
+
+# Setup NAT
+/ip firewall nat add chain=srcnat out-interface=ether1 action=masquerade
+```
+
+```bash Firewall Rules
+# Basic firewall
+/ip firewall filter
+add chain=input connection-state=established,related action=accept
+add chain=input connection-state=invalid action=drop
+add chain=input in-interface=ether1 action=drop
+
+/ip firewall filter
+add chain=forward connection-state=established,related action=accept
+add chain=forward connection-state=invalid action=drop
+add chain=forward in-interface=ether1 action=drop
+```
+
+```bash WireGuard VPN
+# Create WireGuard interface
+/interface wireguard add name=wireguard1 listen-port=51820
+
+# Set private key
+/interface wireguard set wireguard1 private-key="YOUR_PRIVATE_KEY"
+
+# Add peer
+/interface wireguard peers add interface=wireguard1 \
+  public-key="PEER_PUBLIC_KEY" \
+  allowed-address=10.0.0.2/32 \
+  endpoint-address=peer.example.com \
+  endpoint-port=51820
+
+# Assign IP
+/ip address add address=10.0.0.1/24 interface=wireguard1
+```
+
+</CodeGroup>
+
+## Network Design Considerations
+
+### Bridge Configuration in Proxmox
+
+<Accordion title="Creating Network Bridges">
+For proper WAN/LAN separation, create multiple bridges in Proxmox:
+
+**In Proxmox Web UI:**
+1. Node → System → Network
+2. Create → Linux Bridge
+3. **vmbr0**: WAN (connected to internet-facing NIC)
+4. **vmbr1**: LAN (internal network)
+5. Apply configuration
+</Accordion>
+
+### VLAN Configuration
+
+<Accordion title="Using VLANs Instead of Multiple Bridges">
+Alternatively, use VLANs on a single bridge:
+
+```bash
+# Proxmox: VM → Hardware → Network Device → Edit
+# VLAN Tag: 10 (for WAN)
+# VLAN Tag: 20 (for LAN)
+```
+
+Configure VLAN trunking on the physical switch.
+</Accordion>
+
+### High Availability Setup
+
+<Steps>
+  <Step title="Create Two VMs">
+    Deploy two identical firewall VMs (OPNsense/MikroTik)
+  </Step>
+  
+  <Step title="Configure Cluster">
+    Set up HA clustering in the firewall OS
+    - OPNsense: System → High Availability
+    - MikroTik: /interface vrrp
+  </Step>
+  
+  <Step title="Sync Configuration">
+    Enable configuration synchronization between nodes
+  </Step>
+  
+  <Step title="Test Failover">
+    Simulate failure to verify automatic failover
+  </Step>
+</Steps>
+
+## Resource Allocation Guidelines
+
+### CPU Allocation
+
+<AccordionGroup>
+  <Accordion title="Single Core (Testing)">
+    - Basic testing
+    - Lab environments
+    - Low traffic (under 10 Mbps)
+  </Accordion>
+  
+  <Accordion title="2 Cores (Home/SOHO)">
+    - Home networks
+    - Small office (1-10 users)
+    - Traffic up to 100 Mbps
+    - VPN usage
+  </Accordion>
+  
+  <Accordion title="4+ Cores (Business)">
+    - Medium business (10-50 users)
+    - Traffic up to 1 Gbps
+    - IDS/IPS enabled
+    - Multiple VPN connections
+    - Traffic shaping
+  </Accordion>
+</AccordionGroup>
+
+### Memory Recommendations
+
+| Firewall | Minimum | Recommended | Advanced |
+|----------|---------|-------------|----------|
+| OPNsense | 1 GB | 4 GB | 8+ GB |
+| OpenWrt | 256 MB | 512 MB | 1 GB |
+| MikroTik | 256 MB | 1 GB | 2+ GB |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No internet access through firewall">
+    - Verify WAN interface has IP address
+    - Check default gateway configuration
+    - Ensure NAT/masquerading is enabled
+    - Verify firewall rules allow outbound traffic
+    - Check DNS configuration
+  </Accordion>
+  
+  <Accordion title="Cannot access web interface">
+    - Verify LAN IP address configuration
+    - Check network cable/bridge connection
+    - Ensure client is on correct subnet
+    - Try accessing via VM console first
+    - Check firewall rules on WAN interface
+  </Accordion>
+  
+  <Accordion title="Slow throughput performance">
+    - Increase CPU cores
+    - Disable CPU limit in Proxmox
+    - Enable virtio network drivers
+    - Disable IDS/IPS if not needed
+    - Check for CPU throttling
+    - Consider hardware offloading
+  </Accordion>
+  
+  <Accordion title="VPN connection fails">
+    - Verify VPN port forwarding
+    - Check firewall rules
+    - Ensure certificates are valid
+    - Verify routing configuration
+    - Check logs for specific errors
+  </Accordion>
+</AccordionGroup>
+
+## Performance Optimization
+
+<CodeGroup>
+
+```bash Proxmox VM Settings
+# Enable VirtIO for better performance
+# VM → Hardware → Network Device → Model: VirtIO
+
+# Enable multi-queue for VirtIO
+qm set <VMID> -net0 virtio,bridge=vmbr0,queues=4
+```
+
+```bash CPU Pinning
+# Pin vCPUs to physical cores
+qm set <VMID> -vcpus cpus=0-3
+
+# Set CPU type to host for better performance
+qm set <VMID> -cpu host
+```
+
+```bash Disable CPU Limits
+# Remove CPU units limit
+qm set <VMID> -cpuunits 1024
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Linux VMs" icon="linux" href="/reference/vms/linux-vms">
+    Deploy Linux virtual machines
+  </Card>
+  <Card title="Home Assistant" icon="home" href="/reference/vms/haos">
+    Set up home automation
+  </Card>
+  <Card title="VM Overview" icon="layer-group" href="/reference/vms/overview">
+    Back to all VM scripts
+  </Card>
+</CardGroup>

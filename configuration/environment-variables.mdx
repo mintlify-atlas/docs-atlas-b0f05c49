@@ -1,0 +1,506 @@
+---
+title: Environment Variables
+description: Complete reference of configuration variables for container customization
+---
+
+Environment variables provide the most flexible way to configure container deployments. They override all other settings and can be used for both interactive and automated deployments.
+
+## Basic Usage
+
+Set variables before running any installation script:
+
+```bash
+var_cpu=4 var_ram=4096 var_disk=30 bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/debian.sh)"
+```
+
+Or export them for multiple deployments:
+
+```bash
+export var_cpu=4
+export var_ram=4096
+export var_hostname=myserver
+
+bash debian-install.sh
+```
+
+## Resource Allocation
+
+<ParamField path="var_cpu" type="integer" default="1-4 (app-specific)">
+  Number of CPU cores allocated to the container
+  
+  ```bash
+  var_cpu=4  # 4 CPU cores
+  ```
+</ParamField>
+
+<ParamField path="var_ram" type="integer" default="512-4096 (app-specific)">
+  RAM allocation in megabytes (MB)
+  
+  ```bash
+  var_ram=2048  # 2GB RAM
+  var_ram=4096  # 4GB RAM
+  ```
+</ParamField>
+
+<ParamField path="var_disk" type="integer" default="2-20 (app-specific)">
+  Disk size in gigabytes (GB)
+  
+  ```bash
+  var_disk=20  # 20GB disk
+  var_disk=100 # 100GB disk
+  ```
+</ParamField>
+
+<ParamField path="var_unprivileged" type="boolean" default="1">
+  Container privilege level
+  - `1` = Unprivileged (more secure, recommended)
+  - `0` = Privileged (required for Docker/Podman)
+  
+  ```bash
+  var_unprivileged=1  # Unprivileged container
+  var_unprivileged=0  # Privileged (for Docker)
+  ```
+</ParamField>
+
+## Operating System
+
+<ParamField path="var_os" type="string" default="debian">
+  Operating system template
+  - `debian` - Debian Linux
+  - `ubuntu` - Ubuntu Linux
+  - `alpine` - Alpine Linux
+  
+  ```bash
+  var_os=debian
+  var_os=ubuntu
+  var_os=alpine
+  ```
+</ParamField>
+
+<ParamField path="var_version" type="string" default="13">
+  OS version number
+  - Debian: `12`, `13`
+  - Ubuntu: `22.04`, `24.04`
+  - Alpine: `3.19`, `3.20`, `3.21`
+  
+  ```bash
+  var_version=13      # Debian 13
+  var_version=24.04   # Ubuntu 24.04
+  var_version=3.21    # Alpine 3.21
+  ```
+</ParamField>
+
+## Network Configuration
+
+<ParamField path="var_brg" type="string" default="vmbr0">
+  Network bridge interface
+  
+  ```bash
+  var_brg=vmbr0  # Default bridge
+  var_brg=vmbr1  # Alternative bridge
+  ```
+</ParamField>
+
+<ParamField path="var_net" type="string" default="dhcp">
+  Network configuration method
+  - `dhcp` - Automatic IP via DHCP
+  - `192.168.1.100/24` - Static IP with CIDR
+  - `192.168.1.100/24-192.168.1.200/24` - IP range scan (auto-assign first free IP)
+  
+  ```bash
+  var_net=dhcp                                      # DHCP
+  var_net=192.168.1.100/24                         # Static IP
+  var_net=192.168.1.100/24-192.168.1.200/24        # IP range scan
+  ```
+</ParamField>
+
+<Info>
+  **IP Range Scanning**: When you specify a range, the system pings each IP and automatically assigns the first available one. Perfect for automated deployments without manual IP tracking.
+</Info>
+
+<ParamField path="var_gateway" type="string" default="">
+  Default gateway (required for static IP)
+  
+  ```bash
+  var_gateway=192.168.1.1
+  ```
+</ParamField>
+
+<ParamField path="var_ipv6_method" type="string" default="none">
+  IPv6 configuration method
+  - `none` - Disable IPv6
+  - `auto` - Automatic via SLAAC
+  - `dhcp` - DHCPv6
+  
+  ```bash
+  var_ipv6_method=none  # Disable IPv6
+  var_ipv6_method=auto  # Auto-configure
+  ```
+</ParamField>
+
+<ParamField path="var_ipv6_static" type="string" default="">
+  Static IPv6 address with prefix
+  
+  ```bash
+  var_ipv6_static=2001:db8::1/64
+  ```
+</ParamField>
+
+<ParamField path="var_mtu" type="integer" default="1500">
+  Maximum Transmission Unit size
+  
+  ```bash
+  var_mtu=1500   # Standard
+  var_mtu=9000   # Jumbo frames
+  ```
+</ParamField>
+
+<ParamField path="var_vlan" type="integer" default="">
+  VLAN tag ID
+  
+  ```bash
+  var_vlan=100
+  ```
+</ParamField>
+
+<ParamField path="var_mac" type="string" default="auto">
+  MAC address (auto-generated if not specified)
+  
+  ```bash
+  var_mac=AA:BB:CC:DD:EE:FF
+  ```
+</ParamField>
+
+<ParamField path="var_ns" type="string" default="">
+  DNS nameservers (comma-separated)
+  
+  ```bash
+  var_ns=8.8.8.8,1.1.1.1
+  ```
+</ParamField>
+
+<ParamField path="var_searchdomain" type="string" default="">
+  DNS search domain
+  
+  ```bash
+  var_searchdomain=example.com
+  ```
+</ParamField>
+
+## Container Identity
+
+<ParamField path="var_hostname" type="string" default="[app-name]">
+  Container hostname
+  
+  ```bash
+  var_hostname=production-web
+  var_hostname=dev-database
+  ```
+</ParamField>
+
+<ParamField path="var_ctid" type="integer" default="auto">
+  Container ID (auto-assigned if not specified)
+  
+  ```bash
+  var_ctid=100
+  ```
+  
+  <Warning>
+    Ensure the ID is unique across your cluster before setting manually
+  </Warning>
+</ParamField>
+
+<ParamField path="var_tags" type="string" default="community-script">
+  Container tags (semicolon-separated)
+  
+  ```bash
+  var_tags="production;web;nginx"
+  var_tags="development;testing"
+  ```
+</ParamField>
+
+<ParamField path="var_timezone" type="string" default="host timezone">
+  Container timezone
+  
+  ```bash
+  var_timezone=America/New_York
+  var_timezone=Europe/London
+  var_timezone=Asia/Tokyo
+  ```
+</ParamField>
+
+## Security & Access
+
+<ParamField path="var_ssh" type="boolean" default="no">
+  Enable SSH server
+  - `yes` - Install and enable OpenSSH
+  - `no` - No SSH access
+  
+  ```bash
+  var_ssh=yes
+  ```
+</ParamField>
+
+<ParamField path="var_ssh_authorized_key" type="string" default="">
+  SSH public key(s) for root access (newline-separated for multiple keys)
+  
+  ```bash
+  var_ssh_authorized_key="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ... user@host"
+  ```
+</ParamField>
+
+<ParamField path="var_pw" type="string" default="auto-generated">
+  Root password (auto-generated if not specified)
+  
+  ```bash
+  var_pw="SecurePassword123"
+  ```
+  
+  <Warning>
+    Avoid storing passwords in defaults files. Use SSH keys instead.
+  </Warning>
+</ParamField>
+
+<ParamField path="var_protection" type="boolean" default="no">
+  Enable container deletion protection
+  - `yes` - Prevent accidental deletion
+  - `no` - No protection
+  
+  ```bash
+  var_protection=yes
+  ```
+</ParamField>
+
+## Container Features
+
+<ParamField path="var_nesting" type="boolean" default="1">
+  Enable container nesting (required for Docker, Podman, LXC inside LXC)
+  - `1` = Enabled
+  - `0` = Disabled
+  
+  ```bash
+  var_nesting=1  # Enable Docker support
+  ```
+</ParamField>
+
+<ParamField path="var_fuse" type="boolean" default="no">
+  Enable FUSE filesystem support (required for rclone, mergerfs, AppImage)
+  - `yes` = Enabled
+  - `no` = Disabled
+  
+  ```bash
+  var_fuse=yes  # Enable for rclone
+  ```
+</ParamField>
+
+<ParamField path="var_tun" type="boolean" default="no">
+  Enable TUN/TAP device support (required for VPN apps: WireGuard, OpenVPN, Tailscale)
+  - `yes` = Enabled
+  - `no` = Disabled
+  
+  ```bash
+  var_tun=yes  # Enable for VPN
+  ```
+</ParamField>
+
+<ParamField path="var_keyctl" type="boolean" default="0">
+  Enable keyctl syscall (required for Docker containers and systemd-networkd)
+  - `1` = Enabled
+  - `0` = Disabled
+  
+  ```bash
+  var_keyctl=1  # Enable for Docker
+  ```
+  
+  <Note>
+    Automatically enabled for unprivileged containers
+  </Note>
+</ParamField>
+
+<ParamField path="var_mknod" type="boolean" default="0">
+  Allow device node creation (experimental, requires kernel 5.3+)
+  - `1` = Enabled
+  - `0` = Disabled
+  
+  ```bash
+  var_mknod=1
+  ```
+</ParamField>
+
+<ParamField path="var_gpu" type="boolean" default="no">
+  Enable GPU passthrough (auto-detects Intel/AMD/NVIDIA GPUs)
+  - `yes` = Enable hardware acceleration
+  - `no` = No GPU access
+  
+  ```bash
+  var_gpu=yes  # For Plex, Jellyfin, AI/ML
+  ```
+</ParamField>
+
+<ParamField path="var_mount_fs" type="string" default="">
+  Mount host filesystem paths (comma-separated)
+  
+  ```bash
+  var_mount_fs="/mnt/data,/mnt/media"
+  ```
+</ParamField>
+
+## Storage
+
+<ParamField path="var_container_storage" type="string" default="local">
+  Storage location for container root filesystem
+  
+  ```bash
+  var_container_storage=local
+  var_container_storage=local-lvm
+  var_container_storage=pve-thin
+  ```
+</ParamField>
+
+<ParamField path="var_template_storage" type="string" default="local">
+  Storage location for OS templates
+  
+  ```bash
+  var_template_storage=local
+  var_template_storage=nfs-templates
+  ```
+</ParamField>
+
+## Package Management
+
+<ParamField path="var_apt_cacher" type="boolean" default="no">
+  Use APT Cacher-NG proxy (speeds up package downloads)
+  - `yes` = Use caching proxy
+  - `no` = Direct downloads
+  
+  ```bash
+  var_apt_cacher=yes
+  ```
+</ParamField>
+
+<ParamField path="var_apt_cacher_ip" type="string" default="">
+  APT Cacher-NG server IP address
+  
+  ```bash
+  var_apt_cacher_ip=192.168.1.50
+  ```
+</ParamField>
+
+## Debugging
+
+<ParamField path="var_verbose" type="boolean" default="no">
+  Enable verbose output during installation
+  - `yes` = Show detailed logs
+  - `no` = Standard output
+  
+  ```bash
+  var_verbose=yes
+  ```
+</ParamField>
+
+## Complete Example
+
+Here's a production-ready deployment with commonly used variables:
+
+```bash
+#!/bin/bash
+# Production Debian container with all features
+
+var_unprivileged=1 \
+var_cpu=4 \
+var_ram=4096 \
+var_disk=30 \
+var_os=debian \
+var_version=13 \
+var_hostname=production-app \
+var_brg=vmbr0 \
+var_net=192.168.1.100/24 \
+var_gateway=192.168.1.1 \
+var_ipv6_method=none \
+var_ssh=yes \
+var_ssh_authorized_key="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ... admin@workstation" \
+var_nesting=1 \
+var_fuse=yes \
+var_tun=yes \
+var_tags="production;web;automated" \
+var_timezone=America/New_York \
+var_protection=yes \
+var_verbose=no \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/debian.sh)"
+```
+
+## Common Patterns
+
+### Docker Host
+
+```bash
+var_unprivileged=0 \
+var_nesting=1 \
+var_keyctl=1 \
+var_cpu=4 \
+var_ram=8192 \
+var_disk=50 \
+var_hostname=docker-host \
+  bash docker-install.sh
+```
+
+### VPN Gateway
+
+```bash
+var_tun=yes \
+var_cpu=2 \
+var_ram=1024 \
+var_disk=10 \
+var_hostname=wireguard \
+var_tags="vpn;network" \
+  bash wireguard-install.sh
+```
+
+### Media Server with GPU
+
+```bash
+var_gpu=yes \
+var_unprivileged=1 \
+var_cpu=6 \
+var_ram=8192 \
+var_disk=100 \
+var_hostname=plex \
+var_tags="media;transcoding" \
+  bash plex-install.sh
+```
+
+### High-Availability Web Server
+
+```bash
+var_cpu=4 \
+var_ram=4096 \
+var_disk=20 \
+var_hostname=web-prod-01 \
+var_net=192.168.1.50/24 \
+var_gateway=192.168.1.1 \
+var_protection=yes \
+var_tags="production;web;ha" \
+  bash nginx-install.sh
+```
+
+## Variable Validation
+
+<Warning>
+  Only whitelisted variables are accepted for security reasons. Setting unknown variables will have no effect.
+</Warning>
+
+**Allowed Variable Prefixes:**
+- All variables must start with `var_`
+- Custom variables are ignored
+- See the complete list above for all supported variables
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Defaults System" icon="floppy-disk" href="/configuration/defaults-system">
+    Save variables as reusable defaults
+  </Card>
+  <Card title="Unattended Deployment" icon="rocket" href="/configuration/unattended-deployment">
+    Automate deployments with variables
+  </Card>
+</CardGroup>

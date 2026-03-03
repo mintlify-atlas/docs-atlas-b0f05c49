@@ -1,0 +1,200 @@
+---
+title: Welcome to Proxmox VE Helper Scripts
+description: Community-driven automation scripts for Proxmox VE - simplify your homelab setup with one-command installations
+---
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/images/logo-81x112.png" height="120" alt="Proxmox VE Helper Scripts Logo" />
+</div>
+
+# Welcome to Proxmox VE Helper Scripts
+
+**A Community Legacy in Memory of @tteck**
+
+Proxmox VE Helper Scripts simplify your Proxmox VE setup with community-driven automation scripts. Originally created by tteck, the project is now maintained and expanded by the community to help you quickly deploy containers, virtual machines, and tools with simple bash commands.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/getting-started/quickstart">
+    Get up and running in minutes with your first script installation
+  </Card>
+  <Card title="Installation Methods" icon="terminal" href="/getting-started/installation-methods">
+    Choose from web installer, bash commands, or PVEScripts-Local UI
+  </Card>
+  <Card title="Browse Scripts" icon="grid" href="https://helper-scripts.com">
+    Explore 200+ ready-to-use scripts for popular applications
+  </Card>
+  <Card title="Community" icon="users" href="https://discord.gg/3AnUqsXnmK">
+    Join our Discord for support and discussions
+  </Card>
+</CardGroup>
+
+## Why Proxmox VE Helper Scripts?
+
+<CardGroup cols={2}>
+  <Card title="Quick Setup" icon="bolt">
+    One-command installations for popular services and containers. No manual configuration needed.
+  </Card>
+  <Card title="Flexible Configuration" icon="sliders">
+    Simple mode for beginners, advanced options for power users. You're always in control.
+  </Card>
+  <Card title="Auto Updates" icon="arrows-rotate">
+    Keep your installations current with built-in update mechanisms via the update command.
+  </Card>
+  <Card title="Community Driven" icon="heart">
+    Actively maintained with contributions from users worldwide. Built by the community, for the community.
+  </Card>
+</CardGroup>
+
+## What Can You Install?
+
+Proxmox VE Helper Scripts provides automation for:
+
+<Steps>
+  <Step title="Containers (LXC)">
+    Over 200 scripts for deploying lightweight Linux containers running popular applications:
+    - **Home Automation**: Home Assistant, ESPHome, Node-RED
+    - **Media**: Plex, Jellyfin, Emby, Radarr, Sonarr
+    - **Networking**: AdGuard, Pi-hole, Nginx Proxy Manager, WireGuard
+    - **Development**: Docker, Portainer, GitLab, Gitea
+    - **Monitoring**: Uptime Kuma, Grafana, Prometheus
+    - **And many more...**
+  </Step>
+  
+  <Step title="Virtual Machines">
+    Automated VM creation for full operating systems:
+    - Home Assistant OS
+    - Ubuntu (22.04, 24.04, 25.04)
+    - Debian
+    - TrueNAS
+    - OpenWRT, OPNsense
+    - And others...
+  </Step>
+  
+  <Step title="Proxmox Tools">
+    Essential utilities for managing your Proxmox host:
+    - Post-installation setup (`post-pve-install.sh`)
+    - Kernel management and cleaning
+    - LXC batch updates and monitoring
+    - Hardware acceleration setup
+    - USB passthrough configuration
+  </Step>
+</Steps>
+
+## System Requirements
+
+<CardGroup cols={3}>
+  <Card title="Proxmox VE" icon="server">
+    **Version 8.4.x | 9.0.x | 9.1.x**
+    
+    Debian-based with Proxmox tools installed
+  </Card>
+  <Card title="Network" icon="wifi">
+    **Internet connection required**
+    
+    Scripts download packages and images from the web
+  </Card>
+  <Card title="Access" icon="lock">
+    **Shell access to Proxmox**
+    
+    Run commands via the web UI shell or SSH
+  </Card>
+</CardGroup>
+
+<Note>
+  Most scripts create unprivileged containers by default for better security. Privileged containers are only used when necessary (e.g., Docker with USB passthrough).
+</Note>
+
+## How It Works
+
+Proxmox VE Helper Scripts use a two-script architecture:
+
+<Steps>
+  <Step title="Container Script (ct/*.sh)">
+    You run this script from your Proxmox host shell. It:
+    - Sources the `build.func` framework for container creation
+    - Prompts for configuration (or uses defaults in simple mode)
+    - Creates the LXC container with specified resources
+    - Calls the install script inside the container
+  </Step>
+  
+  <Step title="Install Script (install/*-install.sh)">
+    This script runs **inside** the newly created container. It:
+    - Updates the OS packages
+    - Installs application dependencies
+    - Downloads and configures the application
+    - Sets up systemd services for auto-start
+    - Reports success and provides access URL
+  </Step>
+</Steps>
+
+```bash
+# Example: Installing Docker
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/docker.sh)"
+
+# What happens:
+# 1. ct/docker.sh creates the LXC container
+# 2. install/docker-install.sh runs inside and installs Docker
+# 3. You get a running Docker container in ~2 minutes
+```
+
+## Real-World Example
+
+Let's say you want to run **AdGuard Home** for network-wide ad blocking:
+
+<CodeGroup>
+```bash Traditional Method
+# 1. Create LXC container manually in Proxmox UI
+# 2. Configure CPU, RAM, disk, network
+# 3. Start container and open shell
+# 4. Update package lists
+# 5. Install dependencies
+# 6. Download AdGuard binary
+# 7. Extract and move to /opt
+# 8. Create systemd service file
+# 9. Enable and start service
+# 10. Configure firewall
+# ... 20+ manual steps, 30+ minutes
+```
+
+```bash With Helper Scripts
+# One command, 2 minutes:
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/adguard.sh)"
+
+# Done! Access at http://YOUR_IP:3000
+```
+</CodeGroup>
+
+## Community & Support
+
+This project is maintained by the community in memory of tteck, the original creator.
+
+<CardGroup cols={3}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/3AnUqsXnmK">
+    Real-time chat, support, and discussions
+  </Card>
+  <Card title="GitHub Discussions" icon="comments" href="https://github.com/community-scripts/ProxmoxVE/discussions">
+    Feature requests, Q&A, and ideas
+  </Card>
+  <Card title="GitHub Issues" icon="bug" href="https://github.com/community-scripts/ProxmoxVE/issues">
+    Bug reports and issue tracking
+  </Card>
+</CardGroup>
+
+<Info>
+  **Support the Project**: 30% of all donations go directly to cancer research and hospice care in memory of tteck. [Donate on Ko-fi](https://ko-fi.com/community_scripts)
+</Info>
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Run Your First Script" icon="play" href="/getting-started/quickstart">
+    Follow our quickstart guide to install your first application
+  </Card>
+  <Card title="Explore Installation Methods" icon="book" href="/getting-started/installation-methods">
+    Learn about all the ways to use these scripts
+  </Card>
+</CardGroup>
+
+<Warning>
+  Always review scripts before running them on your system. While community-maintained and audited, you should understand what each script does. Visit [helper-scripts.com](https://helper-scripts.com) to browse script details.
+</Warning>

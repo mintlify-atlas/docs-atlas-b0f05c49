@@ -1,0 +1,557 @@
+---
+title: Testing Scripts
+description: Testing procedures and best practices for container and VM scripts
+---
+
+Proper testing ensures that scripts work reliably across different Proxmox VE environments and configurations. This guide covers testing strategies for both container and VM scripts.
+
+## Testing Environment
+
+### Requirements
+
+- **Proxmox VE 8.0+** - Supported versions: 8.0-8.9, 9.0-9.1
+- **Sufficient storage** - At least 50GB free for testing
+- **Network access** - Internet connectivity for downloading packages
+- **Test VM/Container IDs** - Use high numbers (e.g., 900+) to avoid conflicts
+
+<Warning>
+  Always test scripts in a non-production Proxmox environment first. Scripts create VMs/containers and can consume significant resources.
+</Warning>
+
+## Testing Container Scripts
+
+### Basic Testing Workflow
+
+<Steps>
+  <Step title="Test default installation">
+    Run the container script with default settings to verify basic functionality.
+    
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+    ```
+  </Step>
+  
+  <Step title="Test advanced installation">
+    Run the script and choose "Advanced" mode to test the 19-step wizard.
+    
+    ```bash
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+    # Select: Advanced Installation
+    # Verify all 19 configuration steps work
+    ```
+  </Step>
+  
+  <Step title="Verify container functionality">
+    Access the container and verify the application works as expected.
+    
+    ```bash
+    # Enter container
+    pct enter CTID
+    
+    # Check service status
+    systemctl status appname
+    
+    # Verify application responds
+    curl http://localhost:8080
+    ```
+  </Step>
+  
+  <Step title="Test update function">
+    Run the update script to verify it can detect and apply updates.
+    
+    ```bash
+    # From Proxmox host
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/docker.sh)"
+    # Script should detect existing container and offer update
+    ```
+  </Step>
+  
+  <Step title="Clean up">
+    Remove the test container after successful testing.
+    
+    ```bash
+    pct stop CTID
+    pct destroy CTID
+    ```
+  </Step>
+</Steps>
+
+## Testing Install Scripts
+
+### Manual Testing
+
+Since install scripts run inside containers, you need a running container to test them:
+
+```bash
+# Create a test container
+pct create 999 /var/lib/vz/template/cache/debian-12-standard_12.7-1_amd64.tar.zst \
+  --hostname test-container \
+  --memory 2048 \
+  --cores 2 \
+  --rootfs local-lvm:8 \
+  --net0 name=eth0,bridge=vmbr0,ip=dhcp \
+  --unprivileged 1
+
+# Start container
+pct start 999
+
+# Wait for container to boot
+sleep 5
+
+# Execute install script
+pct exec 999 bash < install/docker-install.sh
+
+# Verify installation
+pct exec 999 systemctl status docker
+
+# Clean up
+pct stop 999
+pct destroy 999
+```
+
+### Testing with Different OS Versions
+
+<Tabs>
+  <Tab title="Debian">
+    ```bash
+    # Debian 12 (Bookworm)
+    var_os="debian"
+    var_version="12"
+    
+    # Debian 13 (Trixie)
+    var_os="debian"
+    var_version="13"
+    ```
+  </Tab>
+  
+  <Tab title="Ubuntu">
+    ```bash
+    # Ubuntu 22.04 LTS
+    var_os="ubuntu"
+    var_version="22.04"
+    
+    # Ubuntu 24.04 LTS
+    var_os="ubuntu"
+    var_version="24.04"
+    ```
+  </Tab>
+  
+  <Tab title="Alpine">
+    ```bash
+    # Alpine 3.20
+    var_os="alpine"
+    var_version="3.20"
+    
+    # Alpine 3.21
+    var_os="alpine"
+    var_version="3.21"
+    ```
+  </Tab>
+</Tabs>
+
+## Testing VM Scripts
+
+### Basic VM Testing
+
+<Steps>
+  <Step title="Run VM script">
+    Execute the VM creation script with default settings.
+    
+    ```bash
+    bash vm/haos-vm.sh
+    # Choose: Default Settings
+    ```
+  </Step>
+  
+  <Step title="Verify VM creation">
+    Check that the VM was created successfully.
+    
+    ```bash
+    # List VMs
+    qm list
+    
+    # Check VM configuration
+    qm config VMID
+    
+    # Monitor VM boot
+    qm terminal VMID
+    ```
+  </Step>
+  
+  <Step title="Test VM functionality">
+    Access the VM and verify it boots and functions correctly.
+    
+    ```bash
+    # Wait for VM to boot (30-60 seconds)
+    sleep 60
+    
+    # Check VM status
+    qm status VMID
+    
+    # Get VM IP (if QEMU guest agent is running)
+    qm guest cmd VMID network-get-interfaces
+    ```
+  </Step>
+  
+  <Step title="Clean up">
+    Remove the test VM after successful testing.
+    
+    ```bash
+    qm stop VMID
+    qm destroy VMID
+    ```
+  </Step>
+</Steps>
+
+## Automated Testing
+
+### Test Script Template
+
+```bash test-container-script.sh
+#!/usr/bin/env bash
+
+set -e
+
+SCRIPT_NAME="docker"
+TEST_CTID=999
+
+echo "Testing ct/${SCRIPT_NAME}.sh..."
+
+# Cleanup function
+cleanup() {
+  if pct status $TEST_CTID &>/dev/null; then
+    echo "Cleaning up test container..."
+    pct stop $TEST_CTID 2>/dev/null || true
+    pct destroy $TEST_CTID 2>/dev/null || true
+  fi
+}
+
+trap cleanup EXIT
+
+# Run script with default settings (non-interactive)
+echo "Running container creation..."
+var_ctid=$TEST_CTID bash ct/${SCRIPT_NAME}.sh <<EOF
+
+EOF
+
+# Verify container was created
+if ! pct status $TEST_CTID &>/dev/null; then
+  echo "FAIL: Container was not created"
+  exit 1
+fi
+
+echo "SUCCESS: Container created"
+
+# Verify container is running
+if ! pct status $TEST_CTID | grep -q "running"; then
+  echo "FAIL: Container is not running"
+  exit 1
+fi
+
+echo "SUCCESS: Container is running"
+
+# Enter container and verify service
+if ! pct exec $TEST_CTID systemctl is-active docker &>/dev/null; then
+  echo "FAIL: Docker service is not running"
+  exit 1
+fi
+
+echo "SUCCESS: Docker service is running"
+
+# Test update script
+echo "Testing update function..."
+var_ctid=$TEST_CTID bash ct/${SCRIPT_NAME}.sh <<EOF
+
+EOF
+
+echo "SUCCESS: All tests passed"
+```
+
+### Running Automated Tests
+
+```bash
+# Make test script executable
+chmod +x test-container-script.sh
+
+# Run tests
+./test-container-script.sh
+```
+
+## Common Test Cases
+
+### Container Script Tests
+
+<CodeGroup>
+```bash Resource Limits
+# Test with minimal resources
+var_cpu="1" var_ram="512" var_disk="2" bash ct/app.sh
+
+# Test with maximum resources
+var_cpu="8" var_ram="8192" var_disk="50" bash ct/app.sh
+```
+
+```bash Privileged vs Unprivileged
+# Test unprivileged (default, secure)
+var_unprivileged="1" bash ct/app.sh
+
+# Test privileged (if app requires it)
+var_unprivileged="0" bash ct/app.sh
+```
+
+```bash Different OS Versions
+# Test on Debian 12
+var_os="debian" var_version="12" bash ct/app.sh
+
+# Test on Alpine 3.20
+var_os="alpine" var_version="3.20" bash ct/app.sh
+```
+</CodeGroup>
+
+### Install Script Tests
+
+```bash
+# Test verbose mode
+VERBOSE="yes" pct exec CTID bash < install/app-install.sh
+
+# Test with custom variables
+APP="MyApp" RELEASE="v1.2.3" pct exec CTID bash < install/app-install.sh
+```
+
+### Update Function Tests
+
+```bash
+# Test update with existing version file
+echo "v1.0.0" | pct push CTID - /opt/app_version.txt
+var_ctid=CTID bash ct/app.sh  # Should detect update available
+
+# Test update when already latest
+echo "v2.0.0" | pct push CTID - /opt/app_version.txt
+var_ctid=CTID bash ct/app.sh  # Should report no update needed
+```
+
+## Validation Checklist
+
+### Before Submitting
+
+<Note>
+  Complete ALL items in this checklist before submitting a pull request.
+</Note>
+
+#### Container Scripts (ct/)
+
+- [ ] Script runs successfully with default settings
+- [ ] Script runs successfully with advanced (19-step) settings
+- [ ] Container starts and application is accessible
+- [ ] Service starts on container boot (`systemctl enable`)
+- [ ] Update function detects and applies updates
+- [ ] Update function reports "no update" when current
+- [ ] Tested on target OS (Debian/Ubuntu/Alpine)
+- [ ] Resources (CPU/RAM/Disk) are appropriate
+- [ ] Container is unprivileged unless privileged is required
+- [ ] No errors in container logs (`journalctl -xe`)
+
+#### Install Scripts (install/)
+
+- [ ] Script completes without errors
+- [ ] All dependencies install successfully
+- [ ] Application downloads and extracts correctly
+- [ ] Configuration files are created with correct permissions
+- [ ] Services start successfully
+- [ ] Version file created in `/opt/${APP}_version.txt`
+- [ ] Cleanup runs successfully (no leftover temp files)
+- [ ] Works with both verbose and silent modes
+- [ ] Handles errors gracefully with `msg_error`
+
+#### VM Scripts (vm/)
+
+- [ ] VM creates successfully with default settings
+- [ ] VM creates successfully with advanced settings
+- [ ] VM boots successfully (within 2 minutes)
+- [ ] Network configuration works (IP assigned)
+- [ ] Cloud-init runs successfully (if applicable)
+- [ ] QEMU guest agent reports status
+- [ ] Disk size is appropriate for OS
+- [ ] VM uses q35 machine type (unless i440fx required)
+- [ ] EFI boot works correctly
+- [ ] Image download and extraction succeed
+
+## Debugging Failed Tests
+
+### Container Creation Fails
+
+```bash
+# Check Proxmox logs
+tail -f /var/log/pve/tasks/active
+
+# Check container creation logs
+pct config CTID
+
+# Check container console
+pct console CTID
+
+# Check container logs
+pct exec CTID journalctl -xe
+```
+
+### Service Won't Start
+
+```bash
+# Check service status
+pct exec CTID systemctl status appname
+
+# Check service logs
+pct exec CTID journalctl -u appname -n 50
+
+# Check application logs
+pct exec CTID cat /var/log/appname/error.log
+```
+
+### Network Issues
+
+```bash
+# Check network configuration
+pct config CTID | grep net0
+
+# Test network from container
+pct exec CTID ping -c 3 8.8.8.8
+pct exec CTID curl -I https://google.com
+
+# Check DNS
+pct exec CTID cat /etc/resolv.conf
+```
+
+### Update Function Fails
+
+```bash
+# Check version file
+pct exec CTID cat /opt/app_version.txt
+
+# Test GitHub API manually
+curl -fsSL https://api.github.com/repos/user/repo/releases/latest
+
+# Check update script logic
+pct exec CTID bash -x < ct/app.sh  # Run with debug mode
+```
+
+## Performance Testing
+
+### Resource Usage
+
+```bash
+# Monitor container resources
+pct status CTID --verbose
+
+# Check CPU usage
+pct exec CTID top -bn1 | head -20
+
+# Check memory usage
+pct exec CTID free -h
+
+# Check disk usage
+pct exec CTID df -h
+```
+
+### Load Testing
+
+```bash
+# Test application under load
+ab -n 1000 -c 10 http://container-ip:8080/
+
+# Monitor during load
+watch -n 1 'pct status CTID --verbose'
+```
+
+## Best Practices
+
+### DO:
+
+- **Test on clean Proxmox installation** - Avoid pre-configured environments
+- **Use high container/VM IDs for testing** - e.g., 900+ to avoid conflicts
+- **Test all installation modes** - Default, Advanced, User Defaults
+- **Verify cleanup works** - No leftover files, containers, or VMs
+- **Test update function thoroughly** - Both "update available" and "up to date" scenarios
+- **Document any special requirements** - GPU passthrough, kernel modules, etc.
+- **Test on minimum supported Proxmox version** - PVE 8.0+
+
+### DON'T:
+
+- Test in production environments
+- Skip advanced installation mode testing
+- Forget to test the update function
+- Leave test containers/VMs running
+- Assume it works on all OS versions without testing
+- Ignore error messages or warnings
+- Submit untested code
+
+## Continuous Integration
+
+For maintainers, consider setting up automated testing:
+
+```yaml .github/workflows/test-scripts.yml
+name: Test Container Scripts
+
+on:
+  pull_request:
+    paths:
+      - 'ct/**'
+      - 'install/**'
+
+jobs:
+  test:
+    runs-on: self-hosted  # Proxmox runner
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Test container creation
+        run: |
+          ./tests/test-container-script.sh ${{ matrix.script }}
+        
+      - name: Cleanup
+        if: always()
+        run: |
+          ./tests/cleanup.sh
+    
+    strategy:
+      matrix:
+        script:
+          - docker
+          - pihole
+          - homeassistant
+```
+
+## Reporting Issues
+
+When reporting test failures:
+
+1. **Proxmox version**: `pveversion`
+2. **Script name and version**: `ct/app.sh` or `vm/os-vm.sh`
+3. **Installation mode**: Default/Advanced/etc.
+4. **Error messages**: Full error output
+5. **Container/VM logs**: `journalctl -xe`, `systemctl status`
+6. **Steps to reproduce**: Exact commands used
+
+Example issue report:
+
+```
+Title: Docker container creation fails on Proxmox 8.2
+
+Environment:
+- Proxmox VE: 8.2.1
+- Script: ct/docker.sh
+- Mode: Default installation
+
+Error:
+```
+[Error message here]
+```
+
+Steps to reproduce:
+1. Run: bash ct/docker.sh
+2. Select: Default installation
+3. Error occurs during Docker installation
+
+Logs:
+```
+[Container logs here]
+```
+```

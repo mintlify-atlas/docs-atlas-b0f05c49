@@ -1,0 +1,305 @@
+---
+title: Linux VM Scripts
+description: Create Debian, Ubuntu, Arch Linux, and other Linux virtual machines in Proxmox VE
+---
+
+Linux VM scripts provide a quick way to deploy general-purpose Linux virtual machines with common distributions.
+
+## Available Linux VMs
+
+<CardGroup cols={2}>
+  <Card title="Debian" icon="debian">
+    Stable, well-tested distribution
+  </Card>
+  <Card title="Ubuntu" icon="ubuntu">
+    Popular, user-friendly distribution
+  </Card>
+  <Card title="Arch Linux" icon="archlinux">
+    Rolling release, cutting-edge packages
+  </Card>
+  <Card title="Docker VM" icon="docker">
+    Pre-configured for container workloads
+  </Card>
+</CardGroup>
+
+## Debian Virtual Machines
+
+### Debian 12 (Bookworm)
+
+Debian 12 "Bookworm" is the current stable release, perfect for production servers.
+
+**Script:** `debian-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/debian-vm.sh)"
+```
+
+<Accordion title="Configuration Options">
+- **Default CPU**: 2 cores
+- **Default RAM**: 2048 MB
+- **Default Disk**: 10 GB
+- **SSH**: Enabled by default
+- **Cloud-init**: Supported
+</Accordion>
+
+### Debian 13 (Trixie)
+
+Debian 13 "Trixie" is the testing release with newer packages.
+
+**Script:** `debian-13-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/debian-13-vm.sh)"
+```
+
+<Warning>
+Debian 13 is currently in testing. Use Debian 12 for production systems.
+</Warning>
+
+## Ubuntu Virtual Machines
+
+### Ubuntu 22.04 LTS (Jammy Jellyfish)
+
+Long-term support release, supported until 2027.
+
+**Script:** `ubuntu2204-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/ubuntu2204-vm.sh)"
+```
+
+### Ubuntu 24.04 LTS (Noble Numbat)
+
+Latest LTS release with modern packages and extended support.
+
+**Script:** `ubuntu2404-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/ubuntu2404-vm.sh)"
+```
+
+<Accordion title="Ubuntu 24.04 Features">
+- Linux kernel 6.8
+- Updated systemd
+- Modern security features
+- Support until 2029 (standard)
+- Support until 2034 (with Ubuntu Pro)
+</Accordion>
+
+### Ubuntu 25.04 (Plucky Puffin)
+
+Non-LTS release with cutting-edge features.
+
+**Script:** `ubuntu2504-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/ubuntu2504-vm.sh)"
+```
+
+<Note>
+Ubuntu 25.04 is a short-term release. For production, use an LTS version (22.04 or 24.04).
+</Note>
+
+## Arch Linux
+
+Rolling release distribution with the latest packages and software.
+
+**Script:** `archlinux-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/archlinux-vm.sh)"
+```
+
+<Steps>
+  <Step title="Run the Script">
+    Execute the command above from Proxmox VE shell.
+  </Step>
+  
+  <Step title="Configure VM Settings">
+    Set VM ID, hostname, resources, and network settings.
+  </Step>
+  
+  <Step title="Wait for Installation">
+    The script downloads the latest Arch Linux image and configures the VM.
+  </Step>
+  
+  <Step title="Complete Setup">
+    Access the VM console to finish Arch Linux configuration.
+  </Step>
+</Steps>
+
+### Arch Linux Characteristics
+
+- **Rolling Release**: Always up-to-date packages
+- **Minimal Base**: Install only what you need
+- **AUR Access**: Arch User Repository for additional software
+- **Documentation**: Excellent Arch Wiki
+- **Flexibility**: Full control over system configuration
+
+## Docker VM
+
+Pre-configured Linux VM optimized for running Docker containers.
+
+**Script:** `docker-vm.sh`
+
+```bash
+bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/docker-vm.sh)"
+```
+
+<Accordion title="What's Included">
+- Docker Engine pre-installed
+- Docker Compose included
+- Optimized kernel settings for containers
+- Pre-configured storage drivers
+- Ready for container deployments
+</Accordion>
+
+### Use Cases for Docker VM
+
+- Running containerized applications
+- Docker Swarm clusters
+- Development environments
+- CI/CD pipelines
+- Microservices architecture
+
+## Common Post-Installation Tasks
+
+<CodeGroup>
+
+```bash System Updates
+# Debian/Ubuntu
+sudo apt update && sudo apt upgrade -y
+
+# Arch Linux
+sudo pacman -Syu
+```
+
+```bash Install Essential Tools
+# Debian/Ubuntu
+sudo apt install -y curl wget git vim htop
+
+# Arch Linux
+sudo pacman -S curl wget git vim htop
+```
+
+```bash Configure Firewall
+# Using UFW (Ubuntu/Debian)
+sudo apt install -y ufw
+sudo ufw allow 22/tcp
+sudo ufw enable
+
+# Using firewalld (optional)
+sudo apt install -y firewalld
+sudo firewall-cmd --add-service=ssh --permanent
+sudo firewall-cmd --reload
+```
+
+```bash SSH Key Setup
+# On your local machine
+ssh-keygen -t ed25519 -C "your_email@example.com"
+ssh-copy-id user@vm-ip-address
+
+# Then disable password authentication
+sudo vim /etc/ssh/sshd_config
+# Set: PasswordAuthentication no
+sudo systemctl restart sshd
+```
+
+</CodeGroup>
+
+## Choosing the Right Distribution
+
+<AccordionGroup>
+  <Accordion title="Debian - Best for stability">
+    - Rock-solid stability
+    - Long release cycles
+    - Conservative package updates
+    - Excellent for servers
+    - Large community support
+  </Accordion>
+  
+  <Accordion title="Ubuntu - Best for ease of use">
+    - User-friendly
+    - LTS versions with long support
+    - Large software repository
+    - Commercial support available
+    - Good hardware compatibility
+  </Accordion>
+  
+  <Accordion title="Arch Linux - Best for customization">
+    - Cutting-edge packages
+    - Minimal base system
+    - Build exactly what you need
+    - Excellent documentation
+    - Rolling release model
+  </Accordion>
+  
+  <Accordion title="Docker VM - Best for containers">
+    - Pre-configured for containers
+    - Optimized performance
+    - Docker and Docker Compose ready
+    - Ideal for microservices
+    - Development and production use
+  </Accordion>
+</AccordionGroup>
+
+## Resource Recommendations
+
+### Minimal Configuration
+
+- **CPU**: 1 core
+- **RAM**: 1 GB
+- **Disk**: 8 GB
+- **Use case**: Testing, learning, lightweight services
+
+### Standard Configuration
+
+- **CPU**: 2 cores
+- **RAM**: 2-4 GB
+- **Disk**: 20-32 GB
+- **Use case**: Web servers, databases, general applications
+
+### Performance Configuration
+
+- **CPU**: 4+ cores
+- **RAM**: 8+ GB
+- **Disk**: 50+ GB
+- **Use case**: Docker hosts, development environments, heavy workloads
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="VM won't start after creation">
+    - Check if the image download completed successfully
+    - Verify sufficient storage space
+    - Check Proxmox logs: `journalctl -xe`
+    - Try starting manually from Proxmox web UI
+  </Accordion>
+  
+  <Accordion title="Cannot connect via SSH">
+    - Ensure SSH service is running: `systemctl status sshd`
+    - Check firewall rules
+    - Verify network configuration
+    - Check VM has correct IP address
+  </Accordion>
+  
+  <Accordion title="Cloud-init not working">
+    - Verify cloud-init is installed: `cloud-init --version`
+    - Check cloud-init status: `cloud-init status`
+    - Review logs: `cat /var/log/cloud-init.log`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Network Appliances" icon="network-wired" href="/reference/vms/network-appliances">
+    Set up routers and firewalls
+  </Card>
+  <Card title="Home Assistant" icon="home" href="/reference/vms/haos">
+    Deploy home automation
+  </Card>
+  <Card title="VM Overview" icon="layer-group" href="/reference/vms/overview">
+    Back to all VM scripts
+  </Card>
+</CardGroup>
