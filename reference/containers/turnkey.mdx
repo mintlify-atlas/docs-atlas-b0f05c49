@@ -191,13 +191,17 @@ Turnkey Linux offers 100+ appliances. Popular templates include:
     ```
   </Tab>
 
-  <Tab title="Via Helper Scripts">
-    Some helper scripts may be available for automating Turnkey deployments:
+  <Tab title="Via Helper Script">
+    Use the interactive Turnkey selector script:
     ```bash
-    bash -c "$(wget -qLO - https://github.com/tteck/Proxmox/raw/main/ct/turnkey-app.sh)"
+    bash -c "$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/turnkey/turnkey.sh)"
     ```
 
-    **Note**: Not all Turnkey appliances have dedicated helper scripts. Use Proxmox native template system for most deployments.
+    This script provides:
+    - Interactive menu to select from available Turnkey templates
+    - Automatic template download from official repository
+    - Guided container creation with sensible defaults
+    - Password generation and configuration
   </Tab>
 </Tabs>
 

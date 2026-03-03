@@ -1,9 +1,9 @@
 ---
 title: Function Libraries
-description: Complete reference for all 9 function libraries and their purposes
+description: Complete reference for all 10 function libraries and their purposes
 ---
 
-The Proxmox VE Helper Scripts architecture uses 9 specialized function libraries that work together to create and manage LXC containers and VMs. Each library has a specific purpose and integration point.
+The Proxmox VE Helper Scripts architecture uses 10 specialized function libraries that work together to create and manage LXC containers and VMs. Each library has a specific purpose and integration point.
 
 ## Core Libraries
 
@@ -352,6 +352,43 @@ Cloud-init and VM provisioning functions for automated VM deployment.
 
 ---
 
+### vm-core.func
+
+**VM Core Utilities & Workflow**
+
+Provides core utility functions specifically for VM provisioning workflows, including enhanced messaging, spinners, and VM-specific operations.
+
+<Accordion title="Key Responsibilities">
+- VM-specific color codes and formatting
+- Enhanced messaging for VM operations  
+- Spinner animations for long-running VM tasks
+- VM workflow orchestration
+- Validation checks for VM parameters
+- Development mode support for VMs
+</Accordion>
+
+<Accordion title="Key Functions (30+)">
+- `load_functions()` - Initialize VM utility groups
+- `color()` - Set VM-specific ANSI color codes
+- `msg_info()` - Display VM operation messages
+- `msg_ok()` - Display VM success messages
+- `msg_error()` - Display VM error messages
+- `spinner_start()` - Start progress spinner
+- `spinner_stop()` - Stop progress spinner
+- `validate_vm_id()` - Validate VMID
+- `vm_cleanup()` - Clean up failed VM creation
+</Accordion>
+
+<Accordion title="Integration Points">
+- Sourced by: VM creation scripts (`vm/*.sh`)
+- Works with: `cloud-init.func` for provisioning
+- Provides: VM-specific utilities similar to core.func for containers
+</Accordion>
+
+**Location**: `misc/vm-core.func`
+
+---
+
 ## Function Library Relationships
 
 ```
@@ -393,6 +430,11 @@ Cloud-init and VM provisioning functions for automated VM deployment.
 ├─────────────────────────────────────────────┤
 │                                             │
 │  vm/OsName-vm.sh                            │
+│      ↓ (sources)                            │
+│  vm-core.func                               │
+│      ├─ color(), msg_info()                 │
+│      ├─ spinner operations                  │
+│      └─ VM validation                       │
 │      ↓ (uses)                               │
 │  cloud-init.func                            │
 │      ├─ generate_cloud_init()               │
