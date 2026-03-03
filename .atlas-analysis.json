@@ -1,0 +1,162 @@
+{
+  "projectType": "infrastructure",
+  "projectName": "Proxmox VE Helper Scripts",
+  "projectDescription": "Community-driven automation scripts for simplified Proxmox VE container and VM deployment.",
+  "theme": "aspen",
+  "primaryColor": "#4c9b3f",
+  "lightColor": "#5db34d",
+  "darkColor": "#3a7a30",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation-methods"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/containers-vs-vms",
+              "concepts/script-structure"
+            ]
+          },
+          {
+            "group": "Using Scripts",
+            "pages": [
+              "usage/container-scripts",
+              "usage/vm-scripts",
+              "usage/management-tools",
+              "usage/update-scripts"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/defaults-system",
+              "configuration/environment-variables",
+              "configuration/unattended-deployment"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/popular-apps",
+              "guides/home-assistant",
+              "guides/docker-setup",
+              "guides/networking",
+              "guides/security-hardening"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/exit-codes",
+              "troubleshooting/debug-mode",
+              "troubleshooting/logs"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Contributor Guide",
+            "pages": [
+              "contributing/getting-started",
+              "contributing/guidelines",
+              "contributing/code-of-conduct"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/container-scripts",
+              "development/install-scripts",
+              "development/vm-scripts",
+              "development/testing"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/technical-reference",
+              "architecture/function-libraries",
+              "architecture/build-process",
+              "architecture/error-handling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Script Reference",
+        "groups": [
+          {
+            "group": "Container Scripts",
+            "pages": [
+              "reference/containers/overview",
+              "reference/containers/debian-based",
+              "reference/containers/alpine-based",
+              "reference/containers/turnkey"
+            ]
+          },
+          {
+            "group": "VM Scripts",
+            "pages": [
+              "reference/vms/overview",
+              "reference/vms/linux-vms",
+              "reference/vms/haos",
+              "reference/vms/network-appliances"
+            ]
+          },
+          {
+            "group": "Management Tools",
+            "pages": [
+              "reference/tools/host-tools",
+              "reference/tools/addon-tools",
+              "reference/tools/maintenance"
+            ]
+          },
+          {
+            "group": "Function Libraries",
+            "pages": [
+              "reference/functions/build",
+              "reference/functions/install",
+              "reference/functions/tools",
+              "reference/functions/api"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "One-command installation for 450+ applications",
+    "LXC container and VM automation",
+    "Simple and advanced configuration modes",
+    "Built-in update mechanisms",
+    "Alpine and Debian support",
+    "Comprehensive management tools",
+    "Unattended deployment support",
+    "Extensive function library"
+  ],
+  "publicApiSurface": [
+    "bash -c \"$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/ct/{app}.sh)\"",
+    "bash -c \"$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/vm/{vm}.sh)\"",
+    "bash -c \"$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/addon/{tool}.sh)\"",
+    "bash -c \"$(wget -qLO - https://github.com/community-scripts/ProxmoxVE/raw/main/tools/pve/{tool}.sh)\"",
+    "build.func: build_container(), header_info(), variables()",
+    "install.func: update_os(), network_check(), setting_up_container()",
+    "tools.func: setup_php(), setup_node(), setup_docker()",
+    "Environment variables: var_cpu, var_ram, var_disk, var_os, var_version",
+    "Update functions: update_script() in all container scripts"
+  ]
+}
